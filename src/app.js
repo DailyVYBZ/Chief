@@ -10,6 +10,7 @@ const WATCHLIST_KEY = "chief-watchlist-v1";
 const viewTitles = { dashboard: "Dashboard", watchlist: "Watchlist", setup: "Setup Analyse", journal: "Decision Journal" };
 const euros = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
 const number = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+const createId = () => globalThis.crypto?.randomUUID?.() || `chief-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
@@ -88,7 +89,7 @@ function loadJournal() {
 
 function saveEntry(input, evaluation) {
   const entries = loadJournal();
-  entries.unshift({ id: crypto.randomUUID(), input, evaluation, status: "offen" });
+  entries.unshift({ id: createId(), input, evaluation, status: "offen" });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   renderJournal();
   renderDashboard();

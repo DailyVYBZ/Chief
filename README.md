@@ -21,6 +21,16 @@ npm start
 
 Danach `http://localhost:4173` öffnen. Es gibt keine externen Laufzeitabhängigkeiten.
 
+## Direkt auf Windows starten
+
+Die Datei `dist/Investment-Chief.html` herunterladen und doppelt anklicken. Sie enthält die komplette Anwendung und benötigt keinen lokalen Server.
+
+Nach Änderungen wird die portable Datei so neu erstellt:
+
+```bash
+npm run build:portable
+```
+
 ## Test
 
 ```bash

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 4173",
+    "build:portable": "node scripts/build-portable.mjs",
     "test": "node --test"
   }
 }
