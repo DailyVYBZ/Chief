@@ -12,20 +12,10 @@ const [html, css, engineSource, watchlistSource, appSource] = await Promise.all(
 ]);
 
 const withoutExports = source => source.replace(/^export\s+/gm, "");
-const withoutImports = source => source.replace(/^import\s+.*?;\s*$/gm, "");
-const engine = `const ChiefEngine = (() => {
-${withoutExports(engineSource)}
-return { evaluateSetup };
-})();`;
-const watchlist = `const ChiefWatchlist = (() => {
-${withoutExports(watchlistSource)}
-return { exportWatchlist, getWatchlistSignal, mergeWatchlists, parseWatchlist, SEED_WATCHLIST };
-})();`;
-const app = `(() => {
-const { evaluateSetup } = ChiefEngine;
-const { exportWatchlist, getWatchlistSignal, mergeWatchlists, parseWatchlist, SEED_WATCHLIST } = ChiefWatchlist;
-${withoutImports(appSource)}
-})();`;
+const withoutImports = source => source.replace(/^import\s+[\s\S]*?from\s+["'][^"']+["'];\s*$/gm, "");
+const engine = `const ChiefEngine = (() => {\n${withoutExports(engineSource)}\nreturn { evaluateSetup };\n})();`;
+const watchlist = `const ChiefWatchlist = (() => {\n${withoutExports(watchlistSource)}\nreturn { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist };\n})();`;
+const app = `(() => {\nconst { evaluateSetup } = ChiefEngine;\nconst { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist } = ChiefWatchlist;\n${withoutImports(appSource)}\n})();`;
 new Function(`${engine}\n${watchlist}\n${app}`);
 
 const stylesheetTag = '<link rel="stylesheet" href="styles.css">';

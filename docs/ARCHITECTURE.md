@@ -1,30 +1,43 @@
 # Architekturentscheidungen
 
-## Ziel des ersten Meilensteins
+## Ziel
 
-Ein Instrument durchläuft den vollständigen Prozess Eingabe, Bewertung, Risiko, Entscheidung, Begründung und Dokumentation. Das Ergebnis muss reproduzierbar und für den Nutzer prüfbar sein.
+Ein Instrument durchläuft den vollständigen Prozess Referenzkurs, Trigger, Bestätigung, Einstieg, Risiko, Ziele, Entscheidung und Dokumentation. Das Ergebnis muss reproduzierbar und prüfbar sein.
 
 ## Verbindliche Entscheidungen
 
-1. Externe Plattformen liefern Daten. Chief trifft die Bewertung mit einem eigenen, versionierten Regelwerk.
-2. Fehlende Quelle, fehlender Datenstand, ein ungültiger Stop, ein CRV unter 1,50 oder eine fehlende Invalidierung blockieren eine Handelsfreigabe.
-3. Die Positionsgröße wird durch das Risikobudget und zugleich durch maximal 20 Prozent Portfolioallokation begrenzt.
-4. H4 Trend und H1 Bestätigung erhalten im MVP zusammen 40 von 100 Punkten.
-5. Jede gespeicherte Entscheidung enthält Eingaben, Ergebnis, Regelversion und Bewertungszeitpunkt.
-6. Das MVP speichert lokal im Browser. Eine zentrale Datenbank folgt erst nach Validierung des Ablaufs.
-7. Chief führt eine eigene Watchlist als verlässlichen Arbeitsbestand. Provider liefern Rohdaten und dürfen bestehende Einträge nur über Symbol und Richtung aktualisieren.
-8. Historische Zonen erzeugen kein aktives Signal. Der Nutzer muss sie mit aktuellen Daten erneut bewerten.
-9. Automatische Provider Zugriffe gehören nicht in den Browser. Eine spätere Live Anbindung benötigt einen geschützten Server Adapter.
+1. Externe Plattformen liefern Marktdaten. Chief bewertet mit einem eigenen versionierten Regelwerk.
+2. Trigger und Einstieg sind getrennte Felder. Ein erreichter Kurs allein bestätigt kein Setup.
+3. Long und Short bleiben getrennte Szenarien. Symbol und Richtung bilden den eindeutigen Setup Schlüssel.
+4. Ein aktiver Trigger benötigt eine definierte H1 oder H4 Schlussregel. Ein Docht reicht nicht.
+5. Jeder aktive Plan enthält Referenzkurs, Marktstatus, Aktion, Trigger, Einstieg, Stop Loss, TP1 bis TP3, CRV, Bestätigung, Invalidierung und Szenariowechsel.
+6. Fehlende Quelle, fehlender Datenstand, ein ungültiger Stop, ein CRV unter 1,50 oder eine fehlende Invalidierung blockieren eine Handelsfreigabe in der Setup Analyse.
+7. Referenzkurse älter als 24 Stunden werden als veraltet markiert. Chief zeigt daraus kein frisches Signal.
+8. Die Positionsgröße wird durch das Risikobudget und zugleich durch maximal 20 Prozent Portfolioallokation begrenzt.
+9. H4 Trend und H1 Bestätigung erhalten im Bewertungsmodell zusammen 40 von 100 Punkten.
+10. Jede gespeicherte Entscheidung enthält Eingaben, Ergebnis, Regelversion und Bewertungszeitpunkt.
+11. Das aktuelle MVP speichert Journal und Watchlist lokal im Browser. Die Watchlist Version 2 migriert vorhandene Version 1 Einträge und überschreibt bestätigte gleiche Symbol Richtungs Kombinationen mit dem aktiven Marktplan.
+12. BTC, ETH und SOL dürfen zusätzliche Nachkauflevel enthalten. Diese Level ersetzen keinen Long Trigger für ein Swing Setup.
+13. Automatische Provider Zugriffe gehören nicht in den Browser. Eine spätere Live Anbindung benötigt einen geschützten Server Adapter.
+14. Die portable Einzeldatei muss dieselbe Bewertungslogik und denselben aktiven Marktplan wie die Server Version enthalten.
 
 ## Module
 
-`src/engine.js` enthält alle Berechnungen und keine Oberfläche. `src/app.js` liest Eingaben, rendert das Ergebnis und verwaltet das lokale Journal. Dadurch kann eine spätere Datenanbindung die Bewertungslogik weiterverwenden.
+`src/engine.js` enthält Score, CRV und Positionsgrößen Berechnung ohne Oberflächenlogik.
 
-Die Benutzeroberfläche ist als Arbeitsoberfläche mit vier Ansichten aufgebaut. Dashboard, Watchlist, Setup Analyse und Journal teilen sich denselben lokalen Zustand. Die Navigation wechselt die Ansichten ohne Seitenneuladung. Auf kleinen Bildschirmen ersetzt eine feste untere Navigation die Seitenleiste.
+`src/watchlist.js` enthält Watchlist Versionierung, aktiven Marktplan, Normalisierung, Import, Gruppierung und Signallogik.
+
+`src/app.js` verwaltet Navigation, lokale Speicherung, Migration, Watchlist Darstellung, Setup Übernahme und Decision Journal.
+
+`data/active-watchlist-2026-09-11.json` dokumentiert den bestätigten Marktplan als unabhängigen strukturierten Snapshot.
+
+`scripts/build-portable.mjs` erstellt die autarke Datei `dist/Investment-Chief.html`.
 
 ## Nächste Ausbaustufen
 
-1. Ergebnis eines Trades mit Ausstieg, Gebühren und Regelabweichung erfassen.
-2. Geschützten Provider Adapter für aktuelle Kurse und Nachrichten ergänzen.
-3. Offene Positionen zu Gesamtportfoliorisiko und Korrelation verdichten.
-4. Watchlistwerte nach aktuellem Chief Score priorisieren.
+1. Geschützten Kurs Provider anbinden und Referenzkurse automatisch aktualisieren.
+2. Preisalarme für Trigger und Krypto Nachkauflevel anbinden.
+3. Trade Ergebnis mit Ausstieg, Gebühren und Regelabweichung erfassen.
+4. Offene Positionen zu Gesamtportfoliorisiko und Korrelation verdichten.
+5. Chief Score und Marktstatus mit aktuellen Makro und Nachrichten Katalysatoren ergänzen.
+6. Portfolio und Watchlist zwischen Geräten zentral synchronisieren.
