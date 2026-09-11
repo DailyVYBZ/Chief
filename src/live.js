@@ -3,6 +3,7 @@
   const JOURNAL_KEY = "chief-journal-v1";
   const LIVE_QUOTES_KEY = "chief-live-quotes-v1";
   const SNAPSHOTS_KEY = "chief-market-snapshots-v1";
+  const MANUAL_ANCHOR_KEY = "chief-live-manual-anchor-v1";
   const MODE_KEY = "chief-live-mode-v1";
   const REFRESH_MS = 60_000;
   const MAX_SNAPSHOTS = 20;
@@ -19,6 +20,11 @@
     activeMode: localStorage.getItem(MODE_KEY) === "active",
     portable: location.protocol === "file:"
   };
+
+  if (state.portable && state.activeMode) {
+    state.activeMode = false;
+    localStorage.setItem(MODE_KEY, "shadow");
+  }
 
   function loadJson(key, fallback) {
     try {
@@ -136,10 +142,50 @@
         askPrice: item.askPrice,
         priceAsOf: item.priceAsOf,
         quoteSource: item.quoteSource,
-        quoteProviderSymbol: item.quoteProviderSymbol
+        quoteProviderSymbol: item.quoteProviderSymbol,
+        quoteAuthoritative: item.quoteAuthoritative
       }))
     });
     saveJson(SNAPSHOTS_KEY, snapshots.slice(0, MAX_SNAPSHOTS));
+  }
+
+  function captureManualAnchor() {
+    const anchor = {
+      createdAt: new Date().toISOString(),
+      prices: loadWatchlist().map(item => ({
+        id: item.id,
+        referencePrice: item.referencePrice,
+        askPrice: item.askPrice,
+        priceAsOf: item.priceAsOf,
+        quoteSource: item.quoteSource,
+        quoteProviderSymbol: item.quoteProviderSymbol,
+        quoteAuthoritative: item.quoteAuthoritative
+      }))
+    };
+    saveJson(MANUAL_ANCHOR_KEY, anchor);
+  }
+
+  function restoreManualAnchor() {
+    const anchor = loadJson(MANUAL_ANCHOR_KEY, null);
+    if (!anchor?.prices?.length) return false;
+    const byId = new Map(anchor.prices.map(item => [item.id, item]));
+    const restored = loadWatchlist().map(item => {
+      const previous = byId.get(item.id);
+      if (!previous) return item;
+      const next = {
+        ...item,
+        referencePrice: previous.referencePrice,
+        askPrice: previous.askPrice,
+        priceAsOf: previous.priceAsOf
+      };
+      if (previous.quoteSource) next.quoteSource = previous.quoteSource; else delete next.quoteSource;
+      if (previous.quoteProviderSymbol) next.quoteProviderSymbol = previous.quoteProviderSymbol; else delete next.quoteProviderSymbol;
+      if (previous.quoteAuthoritative !== undefined) next.quoteAuthoritative = previous.quoteAuthoritative; else delete next.quoteAuthoritative;
+      return next;
+    });
+    saveJson(WATCHLIST_KEY, restored);
+    localStorage.removeItem(MANUAL_ANCHOR_KEY);
+    return true;
   }
 
   function applyQuotesToWatchlist(quotes) {
@@ -166,6 +212,12 @@
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "Noch nicht aktualisiert";
     return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  function formatDateTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Stand fehlt";
+    return date.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
   function injectStyles() {
@@ -229,16 +281,17 @@
     const quoteCount = state.quotes.filter(quote => finite(quote.price)).length;
     const modeLabel = state.portable ? "Portable" : state.activeMode ? "Live als Referenz" : "Live Vergleich";
     const nearest = top[0];
-    const last = state.lastSuccess || state.quotes.map(quote => quote.fetchedAt || quote.timestamp).sort().at(-1);
+    const timestamps = state.quotes.map(quote => quote.fetchedAt || quote.timestamp).filter(Boolean).sort();
+    const last = state.lastSuccess || timestamps.at(-1);
 
     panel.innerHTML = `
       <div class="chief-command-main">
         <span class="panel-kicker">Chief Command Center</span>
         <strong>${state.portable ? "Lokaler Modus" : state.lastError ? "Provider teilweise nicht erreichbar" : "Marktdaten Kontrolle aktiv"}</strong>
-        <p>${state.activeMode ? "Provider Kurse aktualisieren die Chief Referenzkurse." : "Provider Kurse laufen als Vergleich. Deine XTB Referenzkurse bleiben unverändert."}</p>
+        <p>${state.activeMode ? "Provider Kurse aktualisieren die Chief Referenzkurse. Beim Ausschalten wird dein vorheriger XTB Kursstand wiederhergestellt." : "Provider Kurse laufen als Vergleich. Deine XTB Referenzkurse bleiben unverändert."}</p>
         <div class="chief-opportunities">${top.map(({ market, signal }) => `<span class="chief-opportunity"><b>${market.symbol}</b>${signal.type === "accumulation" ? "Nachkauf" : signal.type === "short" ? "Short" : "Long"} ${signal.level ? number.format(signal.level) : ""} · ${Number.isFinite(signal.distance) ? percent.format(signal.distance) : "—"}%</span>`).join("")}</div>
         <div class="chief-live-actions">
-          <button type="button" class="secondary compact" id="chief-mode-toggle">${state.activeMode ? "Live Referenz AUS" : "Live Referenz EIN"}</button>
+          <button type="button" class="secondary compact" id="chief-mode-toggle" ${state.portable ? "disabled" : ""}>${state.activeMode ? "Live Referenz AUS" : "Live Referenz EIN"}</button>
           <button type="button" class="secondary compact" id="chief-backup-export">Workspace Backup</button>
           <button type="button" class="secondary compact" id="chief-restore-snapshot">Letzten Kurs Snapshot</button>
         </div>
@@ -260,10 +313,11 @@
       const dot = provider.querySelector(".status-dot");
       if (strong) strong.textContent = state.portable ? "Manuelle XTB Kurse" : state.activeMode ? "Live Referenz aktiv" : "Live Vergleich aktiv";
       if (small) small.textContent = state.portable ? "Portable Modus" : state.lastSuccess ? `Abruf ${formatTime(state.lastSuccess)}` : "Provider bereit";
-      if (dot) {
-        dot.classList.toggle("amber", state.portable || !state.lastSuccess);
-      }
+      if (dot) dot.classList.toggle("amber", state.portable || !state.lastSuccess);
     }
+
+    const version = document.querySelector(".version");
+    if (version) version.textContent = "Chief 0.5.0";
 
     const button = document.querySelector("#chief-live-refresh");
     if (button) {
@@ -282,10 +336,12 @@
       const livePrice = finite(quote?.price);
       const activePrice = state.activeMode && livePrice ? livePrice : market.referencePrice;
       const signal = marketSignal(market, activePrice);
-      const card = document.querySelector(`[data-market-card="${CSS.escape(market.symbol)}"]`);
+      const card = document.querySelector(`[data-market-card="${market.symbol}"]`);
       if (card) {
         const input = card.querySelector("[data-market-price]");
         if (input && state.activeMode && livePrice) input.value = String(livePrice);
+        const timeNode = card.querySelector(".market-price small:not(.chief-live-quote)");
+        if (timeNode && state.activeMode && quote?.timestamp) timeNode.textContent = formatDateTime(quote.timestamp);
         let note = card.querySelector(".chief-live-quote");
         if (!note) {
           note = document.createElement("small");
@@ -305,6 +361,17 @@
           badge.textContent = signal.label;
         }
         if (distance && state.activeMode) distance.textContent = Number.isFinite(signal.distance) ? `${percent.format(signal.distance)} % bis Level` : "";
+
+        for (const direction of ["long", "short"]) {
+          const item = market[direction];
+          const scenario = card.querySelector(`.scenario-card.${direction}`);
+          const scenarioBadge = scenario?.querySelector(".badge");
+          if (scenarioBadge && item && state.activeMode) {
+            const sideSignal = signalForSetup(item, activePrice);
+            scenarioBadge.className = `badge ${sideSignal.tone}`;
+            scenarioBadge.textContent = sideSignal.label;
+          }
+        }
       }
     }
 
@@ -315,8 +382,19 @@
       const quote = currentQuote(symbol);
       const livePrice = finite(quote?.price);
       if (!market || !livePrice) return;
-      if (state.activeMode && row.children[1]) row.children[1].textContent = number.format(livePrice);
-      if (!state.activeMode && row.children[1]) row.children[1].title = `Live Vergleich ${number.format(livePrice)} · ${quote.source}`;
+      if (state.activeMode) {
+        const signal = marketSignal(market, livePrice);
+        if (row.children[1]) row.children[1].textContent = number.format(livePrice);
+        if (row.children[2]) row.children[2].textContent = `${signal.type === "accumulation" ? "Nachkauf" : signal.type === "short" ? "Short" : "Long"} ${signal.level ? number.format(signal.level) : ""}`;
+        if (row.children[3]) row.children[3].textContent = Number.isFinite(signal.distance) ? `${percent.format(signal.distance)} %` : "—";
+        const badge = row.children[4]?.querySelector(".badge");
+        if (badge) {
+          badge.className = `badge ${signal.tone}`;
+          badge.textContent = signal.label;
+        }
+      } else if (row.children[1]) {
+        row.children[1].title = `Live Vergleich ${number.format(livePrice)} · ${quote.source}`;
+      }
     });
   }
 
@@ -350,13 +428,24 @@
   }
 
   function toggleMode() {
-    state.activeMode = !state.activeMode;
-    localStorage.setItem(MODE_KEY, state.activeMode ? "active" : "shadow");
-    if (state.activeMode && state.quotes.length) applyQuotesToWatchlist(state.quotes);
-    updateVisibleCards();
-    updateProviderState();
-    renderCommandCenter();
-    showNotice(state.activeMode ? "Live Provider Kurs ist jetzt Chief Referenzkurs" : "XTB Handkurs ist wieder führend");
+    if (state.portable) return;
+    if (!state.activeMode) {
+      captureManualAnchor();
+      state.activeMode = true;
+      localStorage.setItem(MODE_KEY, "active");
+      if (state.quotes.length) applyQuotesToWatchlist(state.quotes);
+      updateVisibleCards();
+      updateProviderState();
+      renderCommandCenter();
+      showNotice("Live Provider Kurs ist jetzt Chief Referenzkurs");
+      return;
+    }
+
+    const restored = restoreManualAnchor();
+    state.activeMode = false;
+    localStorage.setItem(MODE_KEY, "shadow");
+    showNotice(restored ? "Vorheriger XTB Kursstand wiederhergestellt" : "Live Referenz ausgeschaltet");
+    window.setTimeout(() => location.reload(), restored ? 350 : 0);
   }
 
   function exportWorkspaceBackup() {
@@ -367,6 +456,7 @@
       journal: loadJson(JOURNAL_KEY, []),
       liveQuotes: state.quotes,
       snapshots: loadJson(SNAPSHOTS_KEY, []),
+      manualAnchor: loadJson(MANUAL_ANCHOR_KEY, null),
       liveMode: state.activeMode ? "active" : "shadow"
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -390,6 +480,7 @@
     saveJson(WATCHLIST_KEY, restored);
     state.activeMode = false;
     localStorage.setItem(MODE_KEY, "shadow");
+    localStorage.removeItem(MANUAL_ANCHOR_KEY);
     showNotice(`Kurs Snapshot von ${formatTime(latest.createdAt)} wiederhergestellt`);
     window.setTimeout(() => location.reload(), 350);
   }
