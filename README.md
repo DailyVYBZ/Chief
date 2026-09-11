@@ -13,6 +13,24 @@ Die Anwendung besitzt vier Arbeitsbereiche:
 
 BTC, ETH und SOL enthalten zusätzlich feste Nachkauflevel. ETH besitzt bewusst kein erfundenes Short Setup, solange kein exakter Short Plan bestätigt wurde.
 
+## Chief 0.5 Command Center
+
+Chief 0.5 ergänzt einen lokalen Node Server und ein Live Command Center.
+
+* Öffentliche Referenzkurse für alle zehn Märkte
+* Yahoo Finance als allgemeiner Referenz Provider
+* CoinGecko als Krypto Fallback
+* Automatischer Abruf alle 60 Sekunden im Servermodus
+* Provider Status, letzter Abruf und fehlende Märkte sichtbar
+* Live Vergleich standardmäßig ohne Veränderung deiner XTB Referenzkurse
+* Optionaler Live Referenzmodus mit automatischer Rückkehr zum vorherigen XTB Kursstand
+* Kurs Snapshots vor automatischen Änderungen
+* Workspace Backup mit Watchlist, Journal, Live Kursen und Snapshots
+* Top drei Märkte nach Trigger oder Nachkaufnähe im Command Center
+* Tastenkürzel `R` für Kursabruf und `/` für die Watchlist Suche
+
+Die öffentlichen Provider Kurse sind Referenzwerte und können von XTB CFD Kursen abweichen. Deshalb startet Chief im Vergleichsmodus. Deine XTB Kurse bleiben dort die führende Grundlage für exakte Trigger. Erst wenn du `Live Referenz EIN` aktivierst, schreibt Chief Provider Kurse in die aktive Watchlist. Beim Ausschalten stellt Chief den vorherigen XTB Kursstand wieder her.
+
 ## Aktiver Marktplan
 
 Der Plan vom 11.09.2026 ist als strukturierter Datensatz unter `data/active-watchlist-2026-09-11.json` dokumentiert und als aktiver Startbestand in `src/watchlist.js` hinterlegt.
@@ -25,11 +43,25 @@ Chief behandelt einen Trigger nur als Prüfpunkt. Erst ein abgeschlossener H1 od
 npm start
 ```
 
-Danach `http://localhost:4173` öffnen. Es gibt keine externen Laufzeitabhängigkeiten.
+Danach `http://localhost:4173` öffnen. Der Node Server stellt die Oberfläche und die Route `/api/quotes` bereit.
+
+Optional kann für CoinGecko ein Demo Schlüssel als Umgebungsvariable gesetzt werden:
+
+```bash
+COINGECKO_DEMO_API_KEY=dein_key npm start
+```
+
+Weitere Server Optionen:
+
+```bash
+PORT=4173
+CHIEF_QUOTE_CACHE_MS=15000
+CHIEF_QUOTE_TIMEOUT_MS=8000
+```
 
 ## Direkt auf Windows starten
 
-Die Datei `dist/Investment-Chief.html` herunterladen und doppelt anklicken. Sie enthält die komplette Anwendung und benötigt keinen lokalen Server.
+Die Datei `dist/Investment-Chief.html` herunterladen und doppelt anklicken. Sie enthält die komplette Anwendung und benötigt keinen lokalen Server. In diesem Portable Modus bleibt die Kursführung manuell. Das Command Center, Backups und Snapshots stehen trotzdem zur Verfügung.
 
 Nach Änderungen wird die portable Datei so neu erstellt:
 
@@ -61,6 +93,9 @@ npm test
 * Suche und Assetklassen Filter
 * CSV und JSON Import mit Duplikatkontrolle
 * JSON Export als Sicherung
+* Workspace Backup und Kurs Snapshots
+* Live Vergleich und optionaler Live Referenzmodus
+* Provider Cache, Timeout und Krypto Fallback
 * Migration des bisherigen lokalen Watchlist Bestands auf Version 2
 * Responsive Oberfläche für Smartphone und Desktop
 * Portable Einzeldatei für Windows und andere Desktop Systeme

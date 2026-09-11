@@ -1,10 +1,10 @@
 {
   "name": "dailyvybz-investment-chief",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "python3 -m http.server 4173",
+    "start": "node server.mjs",
     "build:portable": "node scripts/build-portable.mjs",
     "test": "node --test"
   }
