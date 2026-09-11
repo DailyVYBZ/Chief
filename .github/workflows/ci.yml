@@ -1,0 +1,42 @@
+name: Chief CI
+
+on:
+  push:
+    branches:
+      - main
+      - feat/precise-watchlist-2026-09-11
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build portable app
+        run: npm run build:portable
+
+      - name: Commit portable build
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- dist/Investment-Chief.html; then
+            echo "Portable build is current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/Investment-Chief.html
+          git commit -m "Build portable Chief 0.4.0"
+          git push
