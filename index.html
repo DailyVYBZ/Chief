@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#080a0d">
-  <meta name="description" content="DailyVYBZ Investment Chief für Watchlist, Setup Bewertung und Decision Journal">
+  <meta name="description" content="DailyVYBZ Investment Chief für exakte Markttrigger, Watchlist, Setup Bewertung und Decision Journal">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23080a0d'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-size='22' fill='%23c8ff3d'%3E%E2%88%9E%3C/text%3E%3C/svg%3E">
   <title>Chief | Investment System</title>
   <link rel="stylesheet" href="styles.css">
@@ -15,13 +15,13 @@
       <div class="brand"><span>∞</span><div>CHIEF<small>INVESTMENT SYSTEM</small></div></div>
       <nav class="main-nav" aria-label="Hauptnavigation">
         <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></button>
-        <button class="nav-item" data-view="watchlist"><span class="nav-icon">◎</span><span>Watchlist</span><span class="nav-count" id="nav-watchlist-count">8</span></button>
+        <button class="nav-item" data-view="watchlist"><span class="nav-icon">◎</span><span>Watchlist</span><span class="nav-count" id="nav-watchlist-count">10</span></button>
         <button class="nav-item" data-view="setup"><span class="nav-icon">◇</span><span>Setup Analyse</span></button>
         <button class="nav-item" data-view="journal"><span class="nav-icon">▤</span><span>Journal</span><span class="nav-count" id="nav-journal-count">0</span></button>
       </nav>
       <div class="sidebar-foot">
-        <div class="provider-state"><span class="status-dot amber"></span><div><strong>Manuelle Daten</strong><small>Provider vorbereitet</small></div></div>
-        <div class="version">Chief 0.3.0</div>
+        <div class="provider-state"><span class="status-dot amber"></span><div><strong>Manuelle Kurse</strong><small>Exakter Plan aktiv</small></div></div>
+        <div class="version">Chief 0.4.0</div>
       </div>
     </aside>
 
@@ -36,34 +36,34 @@
 
       <main>
         <section class="view active" data-view-panel="dashboard">
-          <div class="welcome-row"><div><p class="eyebrow" id="today-label"></p><h2>Guten Morgen, Sebi.</h2><p>Prüfe zuerst die Datenlage. Danach entscheidest du über Setups.</p></div></div>
+          <div class="welcome-row"><div><p class="eyebrow" id="today-label"></p><h2 id="greeting">Guten Tag, Sebi.</h2><p>Prüfe zuerst den Referenzkurs. Danach zählt nur der bestätigte Trigger.</p></div></div>
 
           <div class="attention-card">
             <div class="attention-icon">!</div>
-            <div><strong id="attention-title">Historische Pläne prüfen</strong><p id="attention-copy">Die gespeicherten Zonen benötigen aktuelle Kurse und eine neue H1 oder H4 Bestätigung.</p></div>
+            <div><strong id="attention-title">Aktiver Marktplan 11.09.2026</strong><p id="attention-copy">Feste Long und Short Trigger sind geladen. Nur abgeschlossene H1 oder H4 Kerzen bestätigen ein Setup.</p></div>
             <button class="secondary compact" type="button" data-open-watchlist>Jetzt prüfen</button>
           </div>
 
           <div class="kpi-grid">
             <article class="kpi-card"><span>Watchlist</span><strong id="dash-market-count">0</strong><small>beobachtete Märkte</small></article>
-            <article class="kpi-card"><span>Trigger nah</span><strong id="dash-actionable-count">0</strong><small>unter 1 Prozent Abstand</small></article>
+            <article class="kpi-card"><span>Handlungsbedarf</span><strong id="dash-actionable-count">0</strong><small>Trigger oder Nachkauf sehr nah</small></article>
             <article class="kpi-card"><span>Offene Entscheidungen</span><strong id="dash-journal-count">0</strong><small>im Decision Journal</small></article>
-            <article class="kpi-card accent"><span>Datenqualität</span><strong id="dash-data-quality">0 %</strong><small>aktuell und validiert</small></article>
+            <article class="kpi-card accent"><span>Datenqualität</span><strong id="dash-data-quality">0 %</strong><small>Referenzkurse unter 24 Stunden</small></article>
           </div>
 
           <div class="dashboard-grid">
             <section class="panel market-panel">
               <div class="panel-head"><div><p class="panel-kicker">Priorität</p><h3>Märkte im Blick</h3></div><button class="text-button" type="button" data-open-watchlist>Alle anzeigen →</button></div>
-              <div class="table-wrap"><table><thead><tr><th>Markt</th><th>Kurs</th><th>Trigger</th><th>Abstand</th><th>Status</th><th></th></tr></thead><tbody id="dashboard-watchlist-body"></tbody></table></div>
+              <div class="table-wrap"><table><thead><tr><th>Markt</th><th>Kurs</th><th>Nächstes Level</th><th>Abstand</th><th>Status</th><th></th></tr></thead><tbody id="dashboard-watchlist-body"></tbody></table></div>
             </section>
 
             <aside class="panel action-panel">
               <div class="panel-head"><div><p class="panel-kicker">Arbeitsfolge</p><h3>Nächste Aktionen</h3></div></div>
               <ol class="action-list">
-                <li><span>1</span><div><strong>Kurse aktualisieren</strong><p>Referenzwerte und Datenzeitpunkt erneuern.</p></div></li>
-                <li><span>2</span><div><strong>Zonen prüfen</strong><p>Trigger, Stop und Ziele am aktuellen Chart bestätigen.</p></div></li>
-                <li><span>3</span><div><strong>Setup bewerten</strong><p>H4 Trend, H1 Bestätigung und CRV erfassen.</p></div></li>
-                <li><span>4</span><div><strong>Entscheidung speichern</strong><p>These und Invalidierung im Journal sichern.</p></div></li>
+                <li><span>1</span><div><strong>Referenzkurs aktualisieren</strong><p>Chief sperrt veraltete Daten nach 24 Stunden.</p></div></li>
+                <li><span>2</span><div><strong>Trigger beobachten</strong><p>Long und Short bleiben getrennte Szenarien.</p></div></li>
+                <li><span>3</span><div><strong>H1 oder H4 Schluss bestätigen</strong><p>Ein Docht aktiviert kein Setup.</p></div></li>
+                <li><span>4</span><div><strong>Risiko und Entscheidung speichern</strong><p>Stop, Ziele, CRV und Szenariowechsel dokumentieren.</p></div></li>
               </ol>
             </aside>
           </div>
@@ -75,48 +75,60 @@
         </section>
 
         <section class="view" data-view-panel="watchlist">
-          <div class="page-intro"><div><p class="eyebrow">Zentrale Marktübersicht</p><h2>Watchlist</h2><p>Alle Datenquellen laufen hier zusammen. Chief sortiert nach Handlungsbedarf.</p></div>
+          <div class="page-intro">
+            <div><p class="eyebrow">Zentrale Marktübersicht</p><h2>Aktive Watchlist</h2><p>Jeder Markt enthält exakte Trigger, Stop, drei Ziele, CRV, Invalidierung und Szenariowechsel.</p></div>
             <div class="toolbar">
               <input type="file" id="watchlist-import" accept=".csv,.json" hidden>
               <button type="button" class="secondary compact" id="import-watchlist">Importieren</button>
               <button type="button" class="secondary compact" id="export-watchlist">Exportieren</button>
-              <button type="button" class="secondary compact" id="restore-seeds">Startbestand ergänzen</button>
+              <button type="button" class="secondary compact" id="restore-seeds">Aktiven Plan wiederherstellen</button>
             </div>
           </div>
 
-          <div class="watchlist-stats">
-            <div><strong id="watchlist-count">0</strong><span>Märkte</span></div>
-            <div><strong id="watchlist-actionable">0</strong><span>Trigger nah</span></div>
-            <div><strong id="watchlist-historical">0</strong><span>historische Pläne</span></div>
+          <div class="watchlist-controls">
+            <label>Suche<input id="watchlist-search" type="search" placeholder="BTC, Gold, Krypto"></label>
+            <label>Assetklasse<select id="asset-filter"><option value="all">Alle</option><option>Krypto</option><option>Index</option><option>Rohstoff</option><option>Forex</option><option>Aktie</option><option>ETF</option></select></label>
           </div>
 
-          <section class="panel">
-            <div class="connection-note"><i></i><span>Chief Watchlist aktiv</span><small>Historische Zonen erzeugen kein aktives Signal.</small></div>
-            <div class="table-wrap watchlist-table"><table><thead><tr><th>Markt</th><th>Richtung</th><th>Referenzkurs</th><th>Trigger</th><th>Abstand</th><th>Status</th><th>Plan</th><th></th></tr></thead><tbody id="watchlist-body"></tbody></table></div>
-            <p class="import-help" id="import-message">CSV und JSON werden unterstützt. Gleiche Symbole und Richtungen werden zusammengeführt.</p>
+          <div class="watchlist-stats four-stats">
+            <div><strong id="watchlist-count">0</strong><span>Märkte</span></div>
+            <div><strong id="watchlist-actionable">0</strong><span>Handlungsbedarf</span></div>
+            <div><strong id="watchlist-crypto">0</strong><span>Krypto Märkte</span></div>
+            <div><strong id="watchlist-stale">0</strong><span>Daten älter als 24 h</span></div>
+          </div>
+
+          <section class="panel watchlist-panel">
+            <div class="connection-note"><i></i><span>Aktiver Marktplan vom 11.09.2026</span><small>Nur abgeschlossene H1 oder H4 Kerzen bestätigen den Trigger.</small></div>
+            <div id="watchlist-body" class="market-card-list"></div>
+            <p class="import-help" id="import-message">CSV und JSON werden unterstützt. Gleiche Symbole und Richtungen werden ohne Duplikate aktualisiert.</p>
           </section>
         </section>
 
         <section class="view" data-view-panel="setup">
-          <div class="page-intro"><div><p class="eyebrow">Regelbasierte Entscheidung</p><h2>Setup Analyse</h2><p>Vom Trigger bis zur dokumentierten Entscheidung in einem Ablauf.</p></div><button type="button" class="secondary compact" id="load-example">Beispiel laden</button></div>
+          <div class="page-intro"><div><p class="eyebrow">Regelbasierte Entscheidung</p><h2>Setup Analyse</h2><p>Vom exakten Trigger bis zur dokumentierten Entscheidung in einem Ablauf.</p></div><button type="button" class="secondary compact" id="load-example">BTC Beispiel laden</button></div>
 
           <div class="analysis-layout">
             <form id="setup-form">
               <section class="panel form-section">
-                <div class="step-title"><span>01</span><div><h3>Instrument</h3><p>Markt und Handelsrichtung</p></div></div>
+                <div class="step-title"><span>01</span><div><h3>Instrument</h3><p>Markt, Richtung, Status und klare Aktion</p></div></div>
                 <div class="form-grid four">
                   <label>Symbol<input name="symbol" required placeholder="z. B. US100"></label>
                   <label>Bezeichnung<input name="company" placeholder="z. B. Nasdaq 100 CFD"></label>
-                  <label>Assetklasse<select name="assetClass"><option>Aktie</option><option>ETF</option><option>Krypto</option><option>Index</option><option>Rohstoff</option></select></label>
+                  <label>Assetklasse<select name="assetClass"><option>Aktie</option><option>ETF</option><option>Krypto</option><option>Index</option><option>Rohstoff</option><option>Forex</option></select></label>
                   <label>Richtung<select name="direction"><option value="long">Long</option><option value="short">Short</option></select></label>
+                </div>
+                <div class="form-grid two">
+                  <label>Marktstatus<input name="marketStatus" required placeholder="z. B. ENTSCHEIDUNGSZONE"></label>
+                  <label>Aktion<input name="action" required placeholder="z. B. Warten bis H1 Schluss über 29.468"></label>
                 </div>
               </section>
 
               <section class="panel form-section">
-                <div class="step-title"><span>02</span><div><h3>Preisplan</h3><p>Trigger, Risiko und Ziele</p></div></div>
-                <div class="form-grid five">
+                <div class="step-title"><span>02</span><div><h3>Preisplan</h3><p>Trigger, Einstieg, Risiko und Ziele</p></div></div>
+                <div class="form-grid six">
+                  <label>Trigger<input type="number" step="any" min="0" name="trigger" required></label>
                   <label>Einstieg<input type="number" step="any" min="0" name="entry" required></label>
-                  <label>Stop<input type="number" step="any" min="0" name="stop" required></label>
+                  <label>Stop Loss<input type="number" step="any" min="0" name="stop" required></label>
                   <label>TP1<input type="number" step="any" min="0" name="tp1" required></label>
                   <label>TP2<input type="number" step="any" min="0" name="tp2" required></label>
                   <label>TP3<input type="number" step="any" min="0" name="tp3" required></label>
@@ -140,23 +152,25 @@
               </section>
 
               <section class="panel form-section">
-                <div class="step-title"><span>04</span><div><h3>Nachweis</h3><p>Quelle, Zeitpunkt und These</p></div></div>
+                <div class="step-title"><span>04</span><div><h3>Nachweis</h3><p>Quelle, Zeitpunkt, Bestätigung und Szenariowechsel</p></div></div>
                 <div class="form-grid two">
                   <label>Datenquelle<input name="dataSource" required placeholder="XTB, Geschäftsbericht, Nachrichtenquelle"></label>
                   <label>Datenstand<input type="datetime-local" name="dataTimestamp" required></label>
                 </div>
+                <label>Bestätigungsregel<input name="confirmationRule" required placeholder="z. B. H1 Schluss über 78.950"></label>
                 <label>These<textarea name="rationale" rows="3" required placeholder="Warum besteht ein Vorteil?"></textarea></label>
-                <label>Invalidierung<textarea name="invalidation" rows="2" required placeholder="Welches Ereignis widerlegt die These?"></textarea></label>
+                <label>Invalidierung<textarea name="invalidation" rows="2" required placeholder="Welches Level macht das Setup ungültig?"></textarea></label>
+                <label>Szenariowechsel<textarea name="scenarioSwitch" rows="2" required placeholder="Wann wechselst du von Long auf Short oder umgekehrt?"></textarea></label>
               </section>
               <button class="primary evaluate" type="submit">Setup bewerten</button>
             </form>
 
-            <aside id="result-panel" class="panel result-panel"><div class="empty-state"><span>◇</span><strong>Noch keine Bewertung</strong><p>Fülle das Setup aus. Chief zeigt hier Score, CRV und Positionsgröße.</p></div></aside>
+            <aside id="result-panel" class="panel result-panel"><div class="empty-state"><span>◇</span><strong>Noch keine Bewertung</strong><p>Fülle das Setup aus. Chief zeigt Score, CRV, Positionsgröße und den vollständigen Preisplan.</p></div></aside>
           </div>
         </section>
 
         <section class="view" data-view-panel="journal">
-          <div class="page-intro"><div><p class="eyebrow">Entscheidungsverlauf</p><h2>Decision Journal</h2><p>Jede Bewertung bleibt mit Regelversion, These und Risiko nachvollziehbar.</p></div></div>
+          <div class="page-intro"><div><p class="eyebrow">Entscheidungsverlauf</p><h2>Decision Journal</h2><p>Jede Bewertung bleibt mit Regelversion, These, Risiko und Szenariowechsel nachvollziehbar.</p></div></div>
           <div class="journal-summary">
             <article><span>Entscheidungen</span><strong id="journal-total">0</strong></article>
             <article><span>Kandidaten</span><strong id="journal-candidates">0</strong></article>
