@@ -2,6 +2,17 @@
 
 Chief führt eine Watchlist und ein Investmentsetup von der Beobachtung bis zur dokumentierten Entscheidung. Das System bewertet H4 Trend, H1 Bestätigung, Marktstruktur, Katalysator, Fundamentaldaten, Liquidität und Chance Risiko Verhältnis. Es berechnet die Positionsgröße und speichert Entscheidungen im lokalen Journal.
 
+## Benutzeroberfläche
+
+Die Anwendung besitzt vier Arbeitsbereiche:
+
+* Dashboard mit Datenqualität, Prioritäten und nächsten Aktionen
+* Watchlist mit Kursen, Triggerabstand und Status
+* Setup Analyse mit Score, CRV und Positionsgröße
+* Decision Journal mit Kennzahlen und gespeicherten Bewertungen
+
+Auf Smartphones steht eine feste Navigation am unteren Bildschirmrand zur Verfügung.
+
 ## Start
 
 ```bash

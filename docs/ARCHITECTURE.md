@@ -20,6 +20,8 @@ Ein Instrument durchläuft den vollständigen Prozess Eingabe, Bewertung, Risiko
 
 `src/engine.js` enthält alle Berechnungen und keine Oberfläche. `src/app.js` liest Eingaben, rendert das Ergebnis und verwaltet das lokale Journal. Dadurch kann eine spätere Datenanbindung die Bewertungslogik weiterverwenden.
 
+Die Benutzeroberfläche ist als Arbeitsoberfläche mit vier Ansichten aufgebaut. Dashboard, Watchlist, Setup Analyse und Journal teilen sich denselben lokalen Zustand. Die Navigation wechselt die Ansichten ohne Seitenneuladung. Auf kleinen Bildschirmen ersetzt eine feste untere Navigation die Seitenleiste.
+
 ## Nächste Ausbaustufen
 
 1. Ergebnis eines Trades mit Ausstieg, Gebühren und Regelabweichung erfassen.
