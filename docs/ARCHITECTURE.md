@@ -12,6 +12,9 @@ Ein Instrument durchläuft den vollständigen Prozess Eingabe, Bewertung, Risiko
 4. H4 Trend und H1 Bestätigung erhalten im MVP zusammen 40 von 100 Punkten.
 5. Jede gespeicherte Entscheidung enthält Eingaben, Ergebnis, Regelversion und Bewertungszeitpunkt.
 6. Das MVP speichert lokal im Browser. Eine zentrale Datenbank folgt erst nach Validierung des Ablaufs.
+7. Chief führt eine eigene Watchlist als verlässlichen Arbeitsbestand. Provider liefern Rohdaten und dürfen bestehende Einträge nur über Symbol und Richtung aktualisieren.
+8. Historische Zonen erzeugen kein aktives Signal. Der Nutzer muss sie mit aktuellen Daten erneut bewerten.
+9. Automatische Provider Zugriffe gehören nicht in den Browser. Eine spätere Live Anbindung benötigt einen geschützten Server Adapter.
 
 ## Module
 
@@ -20,6 +23,6 @@ Ein Instrument durchläuft den vollständigen Prozess Eingabe, Bewertung, Risiko
 ## Nächste Ausbaustufen
 
 1. Ergebnis eines Trades mit Ausstieg, Gebühren und Regelabweichung erfassen.
-2. Watchlist nach Score, Triggernähe und Datenalter sortieren.
+2. Geschützten Provider Adapter für aktuelle Kurse und Nachrichten ergänzen.
 3. Offene Positionen zu Gesamtportfoliorisiko und Korrelation verdichten.
-4. Datenadapter für Kursdaten, Unternehmensdaten und Nachrichten ergänzen.
+4. Watchlistwerte nach aktuellem Chief Score priorisieren.

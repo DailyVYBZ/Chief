@@ -1,6 +1,6 @@
 # DailyVYBZ Investment Chief
 
-Chief führt ein Investmentsetup von der Eingabe bis zur dokumentierten Entscheidung. Das erste MVP bewertet H4 Trend, H1 Bestätigung, Marktstruktur, Katalysator, Fundamentaldaten, Liquidität und Chance Risiko Verhältnis. Es berechnet die Positionsgröße und speichert Entscheidungen im lokalen Journal.
+Chief führt eine Watchlist und ein Investmentsetup von der Beobachtung bis zur dokumentierten Entscheidung. Das System bewertet H4 Trend, H1 Bestätigung, Marktstruktur, Katalysator, Fundamentaldaten, Liquidität und Chance Risiko Verhältnis. Es berechnet die Positionsgröße und speichert Entscheidungen im lokalen Journal.
 
 ## Start
 
@@ -26,5 +26,13 @@ npm test
 * Transparente Punkteverteilung
 * Lokales Decision Journal
 * Responsive Oberfläche für Smartphone und Desktop
+* Zentrale Watchlist mit acht bestätigten Märkten
+* Historische Pläne werden klar gesperrt
+* Status nach Triggernähe und Datenalter
+* CSV und JSON Import mit Duplikatkontrolle
+* JSON Export als Sicherung
+* Direkte Übernahme eines Watchlistwerts in die Setup Bewertung
 
 Die festgehaltenen Entscheidungen stehen in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+Das Importformat steht in [docs/WATCHLIST_IMPORT.md](docs/WATCHLIST_IMPORT.md). Eine ausfüllbare Vorlage liegt unter [examples/watchlist-import.csv](examples/watchlist-import.csv).

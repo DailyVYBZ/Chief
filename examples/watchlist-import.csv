@@ -1,0 +1,2 @@
+symbol;name;assetClass;direction;referencePrice;entry;stop;tp1;tp2;tp3;source;planDate;priceAsOf;planStatus;confirmation
+DE40;DAX CFD;Index;short;26038,8;25945;26020;25790;25730;25550;Beispielimport;2026-09-07;2026-09-10T00:00:00.000Z;historical;H4 Schluss unter Einstieg dann H1 Rücktest

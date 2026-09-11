@@ -18,6 +18,31 @@
       <button type="button" class="secondary" id="load-example">Beispiel laden</button>
     </section>
 
+    <section class="watchlist card" id="watchlist">
+      <div class="watchlist-head">
+        <div class="section-title"><span>WL</span><div><h2>Chief Watchlist</h2><p>Ein zentraler Bestand für alle Datenquellen</p></div></div>
+        <div class="toolbar">
+          <input type="file" id="watchlist-import" accept=".csv,.json" hidden>
+          <button type="button" class="secondary compact" id="import-watchlist">CSV oder JSON importieren</button>
+          <button type="button" class="secondary compact" id="export-watchlist">Exportieren</button>
+          <button type="button" class="secondary compact" id="restore-seeds">Startbestand ergänzen</button>
+        </div>
+      </div>
+      <div class="watchlist-stats">
+        <div><strong id="watchlist-count">0</strong><span>Märkte</span></div>
+        <div><strong id="watchlist-actionable">0</strong><span>Trigger nah</span></div>
+        <div><strong id="watchlist-historical">0</strong><span>historisch</span></div>
+      </div>
+      <div class="connection-note"><i></i><span>Chief Watchlist aktiv</span><small>Provider Import vorbereitet. Historische Zonen werden nie automatisch freigegeben.</small></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Markt</th><th>Richtung</th><th>Referenzkurs</th><th>Trigger</th><th>Abstand</th><th>Status</th><th>Plan</th><th></th></tr></thead>
+          <tbody id="watchlist-body"></tbody>
+        </table>
+      </div>
+      <p class="import-help" id="import-message">Importspalten: symbol, name, assetClass, direction, referencePrice, entry, stop, tp1, tp2, tp3, source, priceAsOf und planStatus.</p>
+    </section>
+
     <form id="setup-form">
       <section class="card">
         <div class="section-title"><span>01</span><div><h2>Setup</h2><p>Instrument und Handelsrichtung</p></div></div>
