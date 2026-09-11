@@ -64,7 +64,10 @@ npm test
 * Migration des bisherigen lokalen Watchlist Bestands auf Version 2
 * Responsive Oberfläche für Smartphone und Desktop
 * Portable Einzeldatei für Windows und andere Desktop Systeme
+* GitHub Actions Tests und portable Builds
 
 Die Architekturentscheidungen stehen in `docs/ARCHITECTURE.md`.
 
 Das Importformat steht in `docs/WATCHLIST_IMPORT.md`. Eine Vorlage liegt unter `examples/watchlist-import.csv`.
+
+Der Umsetzungsstand vom 11.09.2026 steht in `docs/IMPLEMENTATION_2026-09-11.md`.
