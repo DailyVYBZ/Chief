@@ -48,7 +48,8 @@ export function normalizeYahooQuote(chiefSymbol, payload, now = new Date()) {
   const lastTimestamp = Number(result.timestamp?.at?.(-1));
   const timestampSeconds = Number.isFinite(marketTime) && marketTime > 0
     ? marketTime
-    : Number.isFinite(lastTimestamp) && lastTimestamp > 0 ? lastTimestamp : Math.floor(now.getTime() / 1000);
+    : Number.isFinite(lastTimestamp) && lastTimestamp > 0 ? lastTimestamp : null;
+  if (!timestampSeconds) throw new Error("Yahoo Datenzeitpunkt fehlt");
 
   return {
     symbol: chiefSymbol,
@@ -64,7 +65,7 @@ export function normalizeYahooQuote(chiefSymbol, payload, now = new Date()) {
   };
 }
 
-export function normalizeCoinGeckoQuotes(payload, now = new Date()) {
+export function normalizeCoinGeckoQuotes(payload) {
   const byCoinId = Object.fromEntries(
     Object.entries(SYMBOL_MAP)
       .filter(([, config]) => config.coingecko)
@@ -76,6 +77,7 @@ export function normalizeCoinGeckoQuotes(payload, now = new Date()) {
     const price = finiteNumber(data?.usd);
     if (!symbol || !price) return [];
     const updated = Number(data?.last_updated_at);
+    if (!Number.isFinite(updated) || updated <= 0) return [];
     return [{
       symbol,
       providerSymbol: coinId,
@@ -83,7 +85,7 @@ export function normalizeCoinGeckoQuotes(payload, now = new Date()) {
       ask: null,
       bid: null,
       currency: "USD",
-      timestamp: Number.isFinite(updated) && updated > 0 ? new Date(updated * 1000).toISOString() : now.toISOString(),
+      timestamp: new Date(updated * 1000).toISOString(),
       source: "CoinGecko",
       authoritative: false,
       referenceOnly: true
@@ -94,7 +96,13 @@ export function normalizeCoinGeckoQuotes(payload, now = new Date()) {
 export function quoteAgeSeconds(quote, now = new Date()) {
   const timestamp = new Date(quote?.timestamp);
   if (Number.isNaN(timestamp.getTime())) return Infinity;
-  return Math.max(0, (now.getTime() - timestamp.getTime()) / 1000);
+  return (now.getTime() - timestamp.getTime()) / 1000;
+}
+
+export function isFreshQuote(quote, now = new Date()) {
+  const age = quoteAgeSeconds(quote, now);
+  return Boolean(SYMBOL_MAP[quote?.symbol]) && finiteNumber(quote?.price) !== null
+    && Number.isFinite(age) && age >= -300 && age <= 86_400;
 }
 
 export function providerStatus(quotes, requestedSymbols) {

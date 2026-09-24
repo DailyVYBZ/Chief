@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { extname, resolve, sep } from "node:path";
+import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   SYMBOL_MAP,
@@ -8,14 +8,18 @@ import {
   normalizeCoinGeckoQuotes,
   normalizeSymbols,
   normalizeYahooQuote,
-  providerStatus
 } from "./server/providers.mjs";
+import { createQuoteService } from "./server/quote-service.mjs";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const port = Number(process.env.PORT || 4173);
 const cacheTtlMs = Math.max(5_000, Number(process.env.CHIEF_QUOTE_CACHE_MS || 15_000));
 const requestTimeoutMs = Math.max(2_000, Number(process.env.CHIEF_QUOTE_TIMEOUT_MS || 8_000));
-const cache = new Map();
+const quoteService = createQuoteService([
+  { name: "Yahoo Finance", supports: symbol => Boolean(SYMBOL_MAP[symbol]?.yahoo), fetch: yahooQuote },
+  { name: "CoinGecko", supports: symbol => Boolean(SYMBOL_MAP[symbol]?.coingecko),
+    fetch: async symbol => (await coinGeckoQuotes([symbol])).find(quote => quote.symbol === symbol) }
+], { cacheTtlMs });
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -76,72 +80,18 @@ async function coinGeckoQuotes(symbols) {
   return normalizeCoinGeckoQuotes(await fetchJson(url, headers));
 }
 
-function cachedQuote(symbol) {
-  const entry = cache.get(symbol);
-  if (!entry || Date.now() - entry.cachedAt > cacheTtlMs) return null;
-  return entry.quote;
-}
-
-function remember(quote) {
-  cache.set(quote.symbol, { quote, cachedAt: Date.now() });
-  return quote;
-}
-
-async function loadQuotes(requestedSymbols) {
-  const quotes = [];
-  const errors = [];
-  const pending = [];
-
-  for (const symbol of requestedSymbols) {
-    const cached = cachedQuote(symbol);
-    if (cached) quotes.push({ ...cached, cache: "hit" });
-    else pending.push(symbol);
-  }
-
-  const yahooResults = await Promise.allSettled(pending.map(async symbol => remember(await yahooQuote(symbol))));
-  const yahooMissing = [];
-  yahooResults.forEach((result, index) => {
-    const symbol = pending[index];
-    if (result.status === "fulfilled") quotes.push({ ...result.value, cache: "miss" });
-    else {
-      yahooMissing.push(symbol);
-      errors.push({ symbol, provider: "Yahoo Finance", message: result.reason?.message || "Abruf fehlgeschlagen" });
-    }
-  });
-
-  const cryptoMissing = yahooMissing.filter(symbol => SYMBOL_MAP[symbol]?.coingecko);
-  if (cryptoMissing.length) {
-    try {
-      const fallback = await coinGeckoQuotes(cryptoMissing);
-      for (const quote of fallback) {
-        remember(quote);
-        const existingIndex = quotes.findIndex(item => item.symbol === quote.symbol);
-        if (existingIndex >= 0) quotes[existingIndex] = { ...quote, cache: "miss", fallback: true };
-        else quotes.push({ ...quote, cache: "miss", fallback: true });
-      }
-    } catch (error) {
-      for (const symbol of cryptoMissing) errors.push({ symbol, provider: "CoinGecko", message: error.message || "Fallback fehlgeschlagen" });
-    }
-  }
-
-  const latestBySymbol = new Map();
-  for (const quote of quotes) latestBySymbol.set(quote.symbol, quote);
-  return {
-    quotes: requestedSymbols.flatMap(symbol => latestBySymbol.has(symbol) ? [latestBySymbol.get(symbol)] : []),
-    errors
-  };
-}
-
 function safePath(pathname) {
-  const decoded = decodeURIComponent(pathname === "/" ? "/index.html" : pathname);
-  const target = resolve(root, `.${decoded}`);
-  if (target !== root && !target.startsWith(`${root}${sep}`)) return null;
-  return target;
+  let decoded;
+  try { decoded = decodeURIComponent(pathname === "/" ? "/index.html" : pathname); }
+  catch { return null; }
+  // Never expose repository metadata, server code, configuration, or secrets.
+  if (!/^\/(index\.html|styles\.css|src\/(app|engine|watchlist|live)\.js)$/.test(decoded)) return null;
+  return resolve(root, `.${decoded}`);
 }
 
 async function serveStatic(req, res, pathname) {
   const target = safePath(pathname);
-  if (!target) return json(res, 403, { error: "Pfad nicht erlaubt" });
+  if (!target) return json(res, 404, { error: "Datei nicht gefunden" });
   try {
     const info = await stat(target);
     if (!info.isFile()) throw new Error("not-file");
@@ -180,8 +130,8 @@ const server = createServer(async (req, res) => {
     if (!symbols.length) return json(res, 400, { error: "Keine unterstützten Symbole" });
     const startedAt = Date.now();
     try {
-      const result = await loadQuotes(symbols);
-      const status = providerStatus(result.quotes, symbols);
+      const result = await quoteService.load(symbols);
+      const status = result.status;
       return json(res, status.received ? 200 : 502, {
         generatedAt: new Date().toISOString(),
         durationMs: Date.now() - startedAt,
@@ -199,7 +149,7 @@ const server = createServer(async (req, res) => {
   return serveStatic(req, res, url.pathname);
 });
 
-server.listen(port, () => {
-  console.log(`Chief 0.5 läuft auf http://localhost:${port}`);
+server.listen(port, process.env.CHIEF_HOST || "127.0.0.1", () => {
+  console.log(`Chief 0.5 läuft auf http://localhost:${server.address().port}`);
   console.log("Live Provider laufen im Referenzmodus. XTB bleibt für exakte CFD Trigger die maßgebliche Kursquelle.");
 });

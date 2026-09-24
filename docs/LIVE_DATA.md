@@ -73,6 +73,12 @@ Jeder Kurs enthält mindestens Symbol, Provider Symbol, Preis, Zeitstempel, Quel
 * Externe Kurse verändern keine Planparameter
 * Workspace Backup enthält Watchlist, Journal, Live Kurse und Snapshots
 * Portable Datei schaltet den automatischen Live Referenzmodus ab
+* Kurse ohne echten Provider Zeitstempel und Kurse älter als 24 Stunden werden verworfen; Zeitstempel aus der Zukunft über fünf Minuten ebenso
+* Teilweise fehlgeschlagene Abrufe behalten den letzten gespeicherten Wert, kennzeichnen ihn nach Ablauf der Frist aber nicht als frisch
+* Der Server bindet standardmäßig nur an `127.0.0.1`. Für einen bewusst freigegebenen Host kann `CHIEF_HOST` gesetzt werden
+* Der HTTP Server liefert ausschließlich die benötigten Oberflächendateien aus. Repository Daten, Konfiguration und Servercode bleiben unerreichbar
+
+Die Provider sind über `server/quote-service.mjs` registriert. Jeder Adapter bietet `name`, `supports(symbol)` und `fetch(symbol)` und liefert das normalisierte Kursmodell. Ein weiterer Adapter lässt sich in der Serverregistrierung ergänzen. Bei einem Fehler versucht Chief den nächsten Adapter für dieses Symbol.
 
 ## Nächster Schritt
 
