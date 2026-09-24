@@ -85,7 +85,7 @@ function safePath(pathname) {
   try { decoded = decodeURIComponent(pathname === "/" ? "/index.html" : pathname); }
   catch { return null; }
   // Never expose repository metadata, server code, configuration, or secrets.
-  if (!/^\/(index\.html|styles\.css|src\/(app|engine|watchlist|live)\.js)$/.test(decoded)) return null;
+  if (!/^\/(index\.html|styles\.css|src\/(app|engine|watchlist|live|alerts|alerts-ui)\.js)$/.test(decoded)) return null;
   return resolve(root, `.${decoded}`);
 }
 
@@ -99,7 +99,8 @@ async function serveStatic(req, res, pathname) {
     if ((pathname === "/" || pathname === "/index.html") && extname(target) === ".html") {
       const html = body.toString("utf8");
       const liveTag = '<script type="module" src="src/live.js"></script>';
-      body = Buffer.from(html.includes(liveTag) ? html : html.replace("</body>", `  ${liveTag}\n</body>`), "utf8");
+      const alertsTag = '<script type="module" src="src/alerts-ui.js"></script>';
+      body = Buffer.from(html.includes(liveTag) ? html : html.replace("</body>", `  ${liveTag}\n  ${alertsTag}\n</body>`), "utf8");
     }
     res.writeHead(200, {
       "content-type": contentTypes[extname(target)] || "application/octet-stream",
@@ -118,7 +119,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/api/health") {
     return json(res, 200, {
       ok: true,
-      version: "0.5.0",
+      version: "0.6.0",
       quoteMode: "reference-only",
       supportedSymbols: SUPPORTED_SYMBOLS,
       cacheTtlMs
@@ -150,6 +151,6 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, process.env.CHIEF_HOST || "127.0.0.1", () => {
-  console.log(`Chief 0.5 läuft auf http://localhost:${server.address().port}`);
+  console.log(`Chief 0.6 läuft auf http://localhost:${server.address().port}`);
   console.log("Live Provider laufen im Referenzmodus. XTB bleibt für exakte CFD Trigger die maßgebliche Kursquelle.");
 });

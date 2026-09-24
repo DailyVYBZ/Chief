@@ -31,6 +31,10 @@ Chief 0.5 ergänzt einen lokalen Node Server und ein Live Command Center.
 
 Die öffentlichen Provider Kurse sind Referenzwerte und können von XTB CFD Kursen abweichen. Deshalb startet Chief im Vergleichsmodus. Deine XTB Kurse bleiben dort die führende Grundlage für exakte Trigger. Erst wenn du `Live Referenz EIN` aktivierst, schreibt Chief Provider Kurse in die aktive Watchlist. Beim Ausschalten stellt Chief den vorherigen XTB Kursstand wieder her.
 
+## Alarmmodell
+
+Chief verwaltet Long, Short und Krypto Nachkauflevel getrennt. Ein manuell gepflegter Kurs kann den Zustand `Level erreicht` auslösen. Ein H1 oder H4 Schluss erfordert eine zusätzliche manuelle Bestätigung mit Schlusskurs. Doppelte Meldungen bei unverändertem Plan werden unterdrückt. Die letzten 200 Zustandsereignisse liegen lokal im Browser und besitzen eine spätere Journal Zuordnung. Öffentliche Provider Kurse lösen wegen der Abweichung zu XTB keine exakten Alarme aus. Siehe `docs/ALERTS.md`.
+
 ## Aktiver Marktplan
 
 Der Plan vom 11.09.2026 ist als strukturierter Datensatz unter `data/active-watchlist-2026-09-11.json` dokumentiert und als aktiver Startbestand in `src/watchlist.js` hinterlegt.

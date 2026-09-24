@@ -321,7 +321,7 @@
     }
 
     const version = document.querySelector(".version");
-    if (version) version.textContent = "Chief 0.5.0";
+    if (version) version.textContent = "Chief 0.6.0";
 
     const button = document.querySelector("#chief-live-refresh");
     if (button) {

@@ -140,6 +140,7 @@ function renderJournal() {
 
 function saveWatchlist(items) {
   localStorage.setItem(WATCHLIST_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event("chief:watchlist-updated"));
 }
 
 function loadWatchlist() {
@@ -271,7 +272,14 @@ function bindWatchlistActions(root) {
     const symbol = input.dataset.marketPrice;
     const newPrice = Number(input.value) || 0;
     const timestamp = new Date().toISOString();
-    const updated = loadWatchlist().map(item => item.symbol === symbol ? { ...item, referencePrice: newPrice, priceAsOf: timestamp } : item);
+    const updated = loadWatchlist().map(item => {
+      if (item.symbol !== symbol) return item;
+      const manual = { ...item, referencePrice: newPrice, priceAsOf: timestamp };
+      delete manual.quoteSource;
+      delete manual.quoteProviderSymbol;
+      delete manual.quoteAuthoritative;
+      return manual;
+    });
     saveWatchlist(updated);
     renderWatchlist();
     showToast(`${symbol} Referenzkurs aktualisiert`);
