@@ -1,0 +1,7 @@
+# Gemeinsames Positionsmodell für Journal und Portfolio
+
+`src/portfolio.js` bildet den gemeinsamen fachlichen Kern für Issue 1 und Issue 5. Ein Positionseintrag bewahrt das ursprüngliche Setup samt Regelversion, tatsächlichem Einstieg, Stückzahl, Stop, Kontraktfaktor, EUR Umrechnung, Einstiegsgebühr und Ausstiegen. Jeder Teilausstieg hält Kurs, Menge, Gebühr und seine eigene EUR Umrechnung fest. Eine Position ist erst geschlossen, wenn die gesamte Menge ausgebucht wurde.
+
+Die Funktionen berechnen realisiertes Ergebnis in EUR, Prozent und R aus tatsächlich geschlossenen Anteilen. Offenes Risiko wird aus der verbleibenden Menge und dem ursprünglichen Stop berechnet. Portfolio Risiko summiert offene Positionen, zeigt Gruppen und freie Risikokapazität für ein konfiguriertes Limit. Zwei Positionen in derselben Gruppe werden als Konzentration markiert. Das ist eine Gruppierungsheuristik, keine gemessene statistische Korrelation.
+
+Für CFD und Fremdwährungen müssen Kontraktfaktor und Umrechnungsrate aus der tatsächlich gehandelten Instrumentspezifikation und Abrechnung stammen. Der Code setzt sie nicht automatisch auf eins. Er übernimmt keine Orders. Bevor die Werte in der Oberfläche als EUR Ergebnis erscheinen, müssen Brokerdaten, Gebührenregel und Zeitpunkte gegen echte Abrechnungen verifiziert werden. Eine UI, dauerhafte Speicherung, Trade Abschluss, Gewinnquote und Regelabweichungsstatistik gehören noch zur folgenden Integration.

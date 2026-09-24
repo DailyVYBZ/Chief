@@ -18,7 +18,7 @@ Ein Instrument durchläuft den vollständigen Prozess Referenzkurs, Trigger, Bes
 10. Jede gespeicherte Entscheidung enthält Eingaben, Ergebnis, Regelversion und Bewertungszeitpunkt.
 11. Das aktuelle MVP speichert Journal und Watchlist lokal im Browser. Die Watchlist Version 2 migriert vorhandene Version 1 Einträge und überschreibt bestätigte gleiche Symbol Richtungs Kombinationen mit dem aktiven Marktplan.
 12. BTC, ETH und SOL dürfen zusätzliche Nachkauflevel enthalten. Diese Level ersetzen keinen Long Trigger für ein Swing Setup.
-13. Automatische Provider Zugriffe gehören nicht in den Browser. Eine spätere Live Anbindung benötigt einen geschützten Server Adapter.
+13. Automatische Provider Zugriffe gehören nicht in den Browser. Der lokale Server kapselt Yahoo und CoinGecko mit getrennten Adaptern und hält optionale Zugangsdaten nur in Server Umgebungsvariablen.
 14. Die portable Einzeldatei muss dieselbe Bewertungslogik und denselben aktiven Marktplan wie die Server Version enthalten.
 
 ## Module
@@ -33,9 +33,11 @@ Ein Instrument durchläuft den vollständigen Prozess Referenzkurs, Trigger, Bes
 
 `scripts/build-portable.mjs` erstellt die autarke Datei `dist/Investment-Chief.html`.
 
+`server/quote-service.mjs` validiert Zeitstempel und Kurs, koordiniert Provider Fallback und Cache und gibt Teilabdeckung explizit zurück. `server.mjs` stellt nur die öffentliche Oberfläche und die Kurs API bereit.
+
 ## Nächste Ausbaustufen
 
-1. Geschützten Kurs Provider anbinden und Referenzkurse automatisch aktualisieren.
+1. Autoritative XTB CFD Kursquelle ergänzen, sobald ein passender Zugang verfügbar ist.
 2. Preisalarme für Trigger und Krypto Nachkauflevel anbinden.
 3. Trade Ergebnis mit Ausstieg, Gebühren und Regelabweichung erfassen.
 4. Offene Positionen zu Gesamtportfoliorisiko und Korrelation verdichten.

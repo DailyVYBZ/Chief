@@ -998,6 +998,7 @@ function renderJournal() {
 
 function saveWatchlist(items) {
   localStorage.setItem(WATCHLIST_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event("chief:watchlist-updated"));
 }
 
 function loadWatchlist() {
@@ -1129,7 +1130,14 @@ function bindWatchlistActions(root) {
     const symbol = input.dataset.marketPrice;
     const newPrice = Number(input.value) || 0;
     const timestamp = new Date().toISOString();
-    const updated = loadWatchlist().map(item => item.symbol === symbol ? { ...item, referencePrice: newPrice, priceAsOf: timestamp } : item);
+    const updated = loadWatchlist().map(item => {
+      if (item.symbol !== symbol) return item;
+      const manual = { ...item, referencePrice: newPrice, priceAsOf: timestamp };
+      delete manual.quoteSource;
+      delete manual.quoteProviderSymbol;
+      delete manual.quoteAuthoritative;
+      return manual;
+    });
     saveWatchlist(updated);
     renderWatchlist();
     showToast(`${symbol} Referenzkurs aktualisiert`);
@@ -1426,7 +1434,9 @@ if (viewTitles[initialView]) switchView(initialView);
   }
 
   function marketSignal(market, price = market.referencePrice) {
-    if (ageHours(market.priceAsOf) > 24 && state.activeMode) {
+    const quote = currentQuote(market.symbol);
+    const asOf = quote && price === quote.price ? quote.timestamp : market.priceAsOf;
+    if (ageHours(asOf) > 24) {
       return { label: "DATEN ALT", tone: "bad", priority: 6, distance: Infinity, level: null, type: "stale" };
     }
     const candidates = [];
@@ -1452,7 +1462,9 @@ if (viewTitles[initialView]) switchView(initialView);
   }
 
   function currentQuote(symbol) {
-    return state.quotes.find(item => item.symbol === symbol) || null;
+    const quote = state.quotes.find(item => item.symbol === symbol);
+    const age = quote ? (Date.now() - new Date(quote.timestamp).getTime()) / 3_600_000 : Infinity;
+    return age >= -5 / 60 && age <= 24 ? quote : null;
   }
 
   function quotePriceForMarket(market) {
@@ -1526,7 +1538,7 @@ if (viewTitles[initialView]) switchView(initialView);
     const quoteMap = new Map(quotes.map(quote => [quote.symbol, quote]));
     const updated = loadWatchlist().map(item => {
       const quote = quoteMap.get(item.symbol);
-      if (!quote?.price) return item;
+      if (!quote?.price || !currentQuote(item.symbol)) return item;
       return {
         ...item,
         referencePrice: quote.price,
@@ -1649,7 +1661,7 @@ if (viewTitles[initialView]) switchView(initialView);
     }
 
     const version = document.querySelector(".version");
-    if (version) version.textContent = "Chief 0.5.0";
+    if (version) version.textContent = "Chief 0.6.0";
 
     const button = document.querySelector("#chief-live-refresh");
     if (button) {
@@ -1742,11 +1754,13 @@ if (viewTitles[initialView]) switchView(initialView);
       const response = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols.join(","))}`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok && !payload?.quotes?.length) throw new Error(payload?.error || "Marktdaten nicht verfügbar");
-      state.quotes = (payload.quotes || []).map(quote => ({ ...quote, fetchedAt: payload.generatedAt || new Date().toISOString() }));
-      state.lastSuccess = payload.generatedAt || new Date().toISOString();
+      const incoming = (payload.quotes || []).map(quote => ({ ...quote, fetchedAt: payload.generatedAt || new Date().toISOString() }));
+      const received = new Set(incoming.map(quote => quote.symbol));
+      state.quotes = [...incoming, ...state.quotes.filter(quote => !received.has(quote.symbol))];
+      if (incoming.length) state.lastSuccess = payload.generatedAt || new Date().toISOString();
       state.lastError = payload.status?.missing?.length ? `${payload.status.missing.length} Märkte ohne Kurs` : "";
       saveJson(LIVE_QUOTES_KEY, state.quotes);
-      applyQuotesToWatchlist(state.quotes);
+      applyQuotesToWatchlist(incoming);
       updateVisibleCards();
       renderCommandCenter();
       if (manual) showNotice(`${state.quotes.length} Live Referenzkurse aktualisiert`);
@@ -1765,7 +1779,7 @@ if (viewTitles[initialView]) switchView(initialView);
       captureManualAnchor();
       state.activeMode = true;
       localStorage.setItem(MODE_KEY, "active");
-      if (state.quotes.length) applyQuotesToWatchlist(state.quotes);
+      if (state.quotes.length) applyQuotesToWatchlist(state.quotes.filter(quote => currentQuote(quote.symbol)));
       updateVisibleCards();
       updateProviderState();
       renderCommandCenter();
@@ -1865,6 +1879,150 @@ if (viewTitles[initialView]) switchView(initialView);
   else init();
 })();
 
+const ChiefAlerts = (() => {
+const CRYPTO = new Set(["BITCOIN", "ETHEREUM", "SOLANA"]);
+
+function buildAlertDefinitions(items) {
+  const definitions = [];
+  const accumulationSeen = new Set();
+  for (const item of items || []) {
+    if (item.planStatus !== "validated" || !Number.isFinite(Number(item.trigger)) || Number(item.trigger) <= 0) continue;
+    const direction = item.direction === "short" ? "short" : "long";
+    definitions.push({
+      id: `${item.symbol}:trigger:${direction}:${item.planVersion || "v1"}:${item.trigger}`,
+      symbol: item.symbol, type: `${direction}-trigger`, direction,
+      level: Number(item.trigger), timeframe: item.timeframe === "H4" ? "H4" : "H1",
+      planId: item.id, planVersion: item.planVersion || "v1"
+    });
+    if (!CRYPTO.has(item.symbol)) continue;
+    for (const level of item.accumulationLevels || []) {
+      if (!Number.isFinite(Number(level)) || Number(level) <= 0) continue;
+      const id = `${item.symbol}:accumulation:${item.planVersion || "v1"}:${Number(level)}`;
+      if (accumulationSeen.has(id)) continue;
+      accumulationSeen.add(id);
+      definitions.push({ id, symbol: item.symbol, type: "accumulation", direction: "long", level: Number(level),
+        timeframe: null, planId: item.id, planVersion: item.planVersion || "v1" });
+    }
+  }
+  return definitions;
+}
+
+function freshAlertPrice(quote, now = new Date()) {
+  const time = new Date(quote?.timestamp).getTime();
+  const age = now.getTime() - time;
+  return Number.isFinite(time) && age >= -300_000 && age <= 86_400_000
+    && Number.isFinite(Number(quote?.price)) && Number(quote.price) > 0;
+}
+
+function advanceAlert(state, definition, quote, now = new Date()) {
+  if (!freshAlertPrice(quote, now) || state?.status === "confirmed") return { state, event: null };
+  const reached = definition.type === "accumulation" || definition.direction === "short"
+    ? Number(quote.price) <= definition.level : Number(quote.price) >= definition.level;
+  if (!reached || state?.status === "reached") return { state, event: null };
+  const event = { id: crypto.randomUUID(), alertId: definition.id, type: "level-reached", at: now.toISOString(),
+    quoteTimestamp: quote.timestamp, price: Number(quote.price), source: quote.source || "Manuell",
+    journalEntryId: null };
+  return { state: { status: "reached", reachedAt: event.at, lastPrice: event.price, lastSource: event.source }, event };
+}
+
+function confirmAlert(state, definition, { timeframe, closePrice, closedAt }, now = new Date()) {
+  if (definition.type === "accumulation") throw new Error("Nachkauflevel benötigen eine getrennte manuelle Entscheidung");
+  if (state?.status !== "reached") throw new Error("Level wurde noch nicht erreicht");
+  if (timeframe !== definition.timeframe) throw new Error(`Bestätigung benötigt ${definition.timeframe} Schluss`);
+  const time = new Date(closedAt).getTime();
+  if (!Number.isFinite(time) || time < new Date(state.reachedAt).getTime() || time > now.getTime() + 300_000)
+    throw new Error("Kerzenschluss liegt außerhalb des Prüfzeitraums");
+  const price = Number(closePrice);
+  if (!Number.isFinite(price) || price <= 0 || (definition.direction === "short" ? price >= definition.level : price <= definition.level))
+    throw new Error("Kerzenschluss bestätigt den Trigger nicht");
+  const event = { id: crypto.randomUUID(), alertId: definition.id, type: "candle-confirmed", at: now.toISOString(),
+    candleClosedAt: new Date(time).toISOString(), timeframe, price, source: "Manuell bestätigt", journalEntryId: null };
+  return { state: { ...state, status: "confirmed", confirmedAt: event.at, closePrice: price }, event };
+}
+
+return { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice };
+})();
+(() => {
+const { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } = ChiefAlerts;
+
+(() => {
+  const WATCHLIST_KEY = "chief-watchlist-v2";
+  const STATE_KEY = "chief-alert-states-v1";
+  const HISTORY_KEY = "chief-alert-history-v1";
+  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
+  const save = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+  const escape = value => String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+  const label = def => `${def.symbol} ${def.type === "accumulation" ? "Nachkauf" : def.direction === "long" ? "Long" : "Short"} ${def.level}`;
+  const definitions = () => buildAlertDefinitions(read(WATCHLIST_KEY, []));
+
+  function updateFromManualPrices() {
+    const list = read(WATCHLIST_KEY, []);
+    const states = read(STATE_KEY, {});
+    const history = read(HISTORY_KEY, []);
+    for (const def of buildAlertDefinitions(list)) {
+      const item = list.find(entry => entry.symbol === def.symbol && entry.id === def.planId);
+      // Provider reference data have different instruments from XTB and never
+      // create an exact alarm. Only explicit manual Watchlist prices can do so.
+      if (!item || item.quoteSource || !freshAlertPrice({ price: item.referencePrice, timestamp: item.priceAsOf })) continue;
+      const result = advanceAlert(states[def.id], def, {
+        price: item.referencePrice, timestamp: item.priceAsOf, source: "Manuelle Watchlist"
+      });
+      if (result.event) { states[def.id] = result.state; history.unshift(result.event); }
+    }
+    save(STATE_KEY, states);
+    save(HISTORY_KEY, history.slice(0, 200));
+    render();
+  }
+
+  function render() {
+    const panel = document.querySelector("#chief-alerts");
+    if (!panel) return;
+    const defs = definitions();
+    const states = read(STATE_KEY, {});
+    const history = read(HISTORY_KEY, []);
+    const reached = defs.filter(def => states[def.id]?.status === "reached");
+    const confirmed = defs.filter(def => states[def.id]?.status === "confirmed");
+    panel.innerHTML = `<h3>Alarme <small>${reached.length} Level erreicht · ${confirmed.length} bestätigt · ${defs.length} Pläne</small></h3>
+      <p>Automatische XTB Alarme benötigen eine passende Kursquelle. Manuell gepflegte Kurse markieren nur Level erreicht. Den Kerzenschluss bestätigst du selbst.</p>
+      <details><summary>Aktive und ausgelöste Alarme</summary>
+      ${reached.length ? reached.map(def => `<form data-alert-id="${escape(def.id)}"><strong>${escape(label(def))}</strong>
+        <span>Level erreicht um ${escape(states[def.id].reachedAt)} · ${escape(states[def.id].lastSource)}</span>
+        ${def.type === "accumulation" ? "<span>Nachkauf separat prüfen</span>" : `<label>${def.timeframe} Schlusskurs <input name="closePrice" type="number" step="any" required></label><button class="secondary compact" type="submit">Schluss bestätigen</button>`}</form>`).join("") : "<p>Kein ausgelöstes Level.</p>"}
+      <p>${defs.length - reached.length - confirmed.length} weitere Level aktiv. Bereits bestätigte Level bleiben bis zu einer neuen Planversion dokumentiert.</p>
+      <h4>Alarmhistorie</h4><ol>${history.slice(0, 15).map(event => `<li>${escape(event.at)} · ${escape(event.alertId)} · ${escape(event.type)} · ${escape(event.price)}</li>`).join("") || "<li>Noch kein Ereignis</li>"}</ol></details>`;
+    panel.querySelectorAll("form[data-alert-id]").forEach(form => form.addEventListener("submit", event => {
+      event.preventDefault();
+      const def = defs.find(item => item.id === form.dataset.alertId);
+      const states = read(STATE_KEY, {});
+      try {
+        const result = confirmAlert(states[def.id], def, {
+          timeframe: def.timeframe, closePrice: form.elements.closePrice.value, closedAt: new Date().toISOString()
+        });
+        states[def.id] = result.state;
+        save(STATE_KEY, states);
+        save(HISTORY_KEY, [result.event, ...read(HISTORY_KEY, [])].slice(0, 200));
+        render();
+      } catch (error) { window.alert(error.message); }
+    }));
+  }
+
+  function init() {
+    const anchor = document.querySelector(".attention-card");
+    if (!anchor) return;
+    const panel = document.createElement("section");
+    panel.id = "chief-alerts";
+    panel.className = "panel";
+    panel.style.cssText = "margin:12px 0;padding:14px 18px";
+    anchor.insertAdjacentElement("afterend", panel);
+    window.addEventListener("chief:watchlist-updated", updateFromManualPrices);
+    window.addEventListener("storage", event => { if (event.key === WATCHLIST_KEY) updateFromManualPrices(); });
+    updateFromManualPrices();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });
+  else init();
+})();
+
+})();
 </script>
 </body>
 </html>

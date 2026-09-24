@@ -59,6 +59,13 @@ test("fällt bei Yahoo auf den letzten Schlusskurs zurück", () => {
   assert.equal(quote.price, 104.35);
 });
 
+test("erfindet bei fehlendem Provider Zeitstempel keinen aktuellen Kurs", () => {
+  assert.throws(() => normalizeYahooQuote("GOLD", {
+    chart: { result: [{ meta: { regularMarketPrice: 2300 }, indicators: { quote: [{ close: [2300] }] } }] }
+  }), /Datenzeitpunkt fehlt/);
+  assert.deepEqual(normalizeCoinGeckoQuotes({ bitcoin: { usd: 79000 } }), []);
+});
+
 test("normalisiert CoinGecko Fallback nur für verfügbare Kryptos", () => {
   const quotes = normalizeCoinGeckoQuotes({
     bitcoin: { usd: 79000, last_updated_at: 1789142400 },

@@ -94,7 +94,9 @@
   }
 
   function marketSignal(market, price = market.referencePrice) {
-    if (ageHours(market.priceAsOf) > 24 && state.activeMode) {
+    const quote = currentQuote(market.symbol);
+    const asOf = quote && price === quote.price ? quote.timestamp : market.priceAsOf;
+    if (ageHours(asOf) > 24) {
       return { label: "DATEN ALT", tone: "bad", priority: 6, distance: Infinity, level: null, type: "stale" };
     }
     const candidates = [];
@@ -120,7 +122,9 @@
   }
 
   function currentQuote(symbol) {
-    return state.quotes.find(item => item.symbol === symbol) || null;
+    const quote = state.quotes.find(item => item.symbol === symbol);
+    const age = quote ? (Date.now() - new Date(quote.timestamp).getTime()) / 3_600_000 : Infinity;
+    return age >= -5 / 60 && age <= 24 ? quote : null;
   }
 
   function quotePriceForMarket(market) {
@@ -194,7 +198,7 @@
     const quoteMap = new Map(quotes.map(quote => [quote.symbol, quote]));
     const updated = loadWatchlist().map(item => {
       const quote = quoteMap.get(item.symbol);
-      if (!quote?.price) return item;
+      if (!quote?.price || !currentQuote(item.symbol)) return item;
       return {
         ...item,
         referencePrice: quote.price,
@@ -317,7 +321,7 @@
     }
 
     const version = document.querySelector(".version");
-    if (version) version.textContent = "Chief 0.5.0";
+    if (version) version.textContent = "Chief 0.6.0";
 
     const button = document.querySelector("#chief-live-refresh");
     if (button) {
@@ -410,11 +414,13 @@
       const response = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols.join(","))}`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok && !payload?.quotes?.length) throw new Error(payload?.error || "Marktdaten nicht verfügbar");
-      state.quotes = (payload.quotes || []).map(quote => ({ ...quote, fetchedAt: payload.generatedAt || new Date().toISOString() }));
-      state.lastSuccess = payload.generatedAt || new Date().toISOString();
+      const incoming = (payload.quotes || []).map(quote => ({ ...quote, fetchedAt: payload.generatedAt || new Date().toISOString() }));
+      const received = new Set(incoming.map(quote => quote.symbol));
+      state.quotes = [...incoming, ...state.quotes.filter(quote => !received.has(quote.symbol))];
+      if (incoming.length) state.lastSuccess = payload.generatedAt || new Date().toISOString();
       state.lastError = payload.status?.missing?.length ? `${payload.status.missing.length} Märkte ohne Kurs` : "";
       saveJson(LIVE_QUOTES_KEY, state.quotes);
-      applyQuotesToWatchlist(state.quotes);
+      applyQuotesToWatchlist(incoming);
       updateVisibleCards();
       renderCommandCenter();
       if (manual) showNotice(`${state.quotes.length} Live Referenzkurse aktualisiert`);
@@ -433,7 +439,7 @@
       captureManualAnchor();
       state.activeMode = true;
       localStorage.setItem(MODE_KEY, "active");
-      if (state.quotes.length) applyQuotesToWatchlist(state.quotes);
+      if (state.quotes.length) applyQuotesToWatchlist(state.quotes.filter(quote => currentQuote(quote.symbol)));
       updateVisibleCards();
       updateProviderState();
       renderCommandCenter();
