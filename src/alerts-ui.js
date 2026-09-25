@@ -15,7 +15,6 @@ import { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } fr
     const list = read(WATCHLIST_KEY, []);
     const states = read(STATE_KEY, {});
     const history = read(HISTORY_KEY, []);
-    const journal = read(JOURNAL_KEY, []);
     for (const def of buildAlertDefinitions(list)) {
       const item = list.find(entry => entry.symbol === def.symbol && entry.id === def.planId);
       // Provider reference data have different instruments from XTB and never
@@ -38,13 +37,14 @@ import { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } fr
     const states = read(STATE_KEY, {});
     const history = read(HISTORY_KEY, []);
     const reached = defs.filter(def => states[def.id]?.status === "reached");
+    const journal = read(JOURNAL_KEY, []);
     const confirmed = defs.filter(def => states[def.id]?.status === "confirmed");
     panel.innerHTML = `<h3>Alarme <small>${reached.length} Level erreicht · ${confirmed.length} bestätigt · ${defs.length} Pläne</small></h3>
       <p>Automatische XTB Alarme benötigen eine passende Kursquelle. Manuell gepflegte Kurse markieren nur Level erreicht. Den Kerzenschluss bestätigst du selbst.</p>
       <details><summary>Aktive und ausgelöste Alarme</summary>
       ${reached.length ? reached.map(def => `<form data-alert-id="${escape(def.id)}"><strong>${escape(label(def))}</strong>
         <span>Level erreicht um ${escape(states[def.id].reachedAt)} · ${escape(states[def.id].lastSource)}</span>
-        ${def.type === "accumulation" ? "<span>Nachkauf separat prüfen</span>" : `<label>${def.timeframe} Schlusskurs <input name="closePrice" type="number" step="any" required></label><button class="secondary compact" type="submit">Schluss bestätigen</button>`}</form>`).join("") : "<p>Kein ausgelöstes Level.</p>"}
+        ${def.type === "accumulation" ? "<span>Nachkauf separat prüfen</span>" : `<label>${def.timeframe} Schlusskurs <input name="closePrice" type="number" step="any" required></label><label>Zeitpunkt des Kerzenschlusses <input name="closedAt" type="datetime-local" required></label><button class="secondary compact" type="submit">Schluss bestätigen</button>`}</form>`).join("") : "<p>Kein ausgelöstes Level.</p>"}
       <p>${defs.length - reached.length - confirmed.length} weitere Level aktiv. Bereits bestätigte Level bleiben bis zu einer neuen Planversion dokumentiert.</p>
       <h4>Alarmhistorie</h4><ol>${history.slice(0, 15).map(event => `<li>${escape(event.at)} · ${escape(event.alertId)} · ${escape(event.type)} · ${escape(event.price)}
         <label>Journal <select data-event-id="${escape(event.id)}"><option value="">Keine Zuordnung</option>${journal.map(entry => `<option value="${escape(entry.id)}" ${event.journalEntryId === entry.id ? "selected" : ""}>${escape(entry.input?.symbol)} · ${escape(entry.evaluation?.evaluatedAt)}</option>`).join("")}</select></label></li>`).join("") || "<li>Noch kein Ereignis</li>"}</ol></details>`;
@@ -58,7 +58,7 @@ import { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } fr
       const states = read(STATE_KEY, {});
       try {
         const result = confirmAlert(states[def.id], def, {
-          timeframe: def.timeframe, closePrice: form.elements.closePrice.value, closedAt: new Date().toISOString()
+          timeframe: def.timeframe, closePrice: form.elements.closePrice.value, closedAt: form.elements.closedAt.value
         });
         states[def.id] = result.state;
         save(STATE_KEY, states);

@@ -58,6 +58,7 @@ function render() {
           <label>EUR je Kurswährung<input name="fxEurPerCurrency" type="number" step="any" min="0.000001" required></label>
           <label>Ausstiegsgebühr EUR<input name="feeEur" type="number" step="any" min="0" value="0" required></label>
           <label>Erreichtes Ziel<input name="target" placeholder="z. B. TP1"></label>
+          <label>Tatsächlicher Ausstiegszeitpunkt<input name="closedAt" type="datetime-local" required></label>
           <button class="secondary compact" type="submit">Teilverkauf oder Abschluss</button>
         </form>` : `<p>Ergebnis ${dec.format(result.realizedPercent)} % · ${dec.format(result.realizedR)} R</p>
         <form data-review="${escape(position.id)}"><label>Regeltreue <select name="ruleDeviation"><option value="">Noch ungeprüft</option><option value="false" ${position.ruleDeviation === false ? "selected" : ""}>Regeln eingehalten</option><option value="true" ${position.ruleDeviation === true ? "selected" : ""}>Abweichung</option></select></label>
@@ -95,7 +96,7 @@ function render() {
     const input = Object.fromEntries(new FormData(form));
     try {
       const next = positions().map(position => position.id === form.dataset.exit
-        ? recordExit(position, { ...input, closedAt: new Date().toISOString() }) : position);
+        ? recordExit(position, input) : position);
       save(KEY, next); render();
     } catch (error) { errorMessage(error); }
   }));
