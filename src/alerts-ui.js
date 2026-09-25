@@ -4,6 +4,7 @@ import { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } fr
   const WATCHLIST_KEY = "chief-watchlist-v2";
   const STATE_KEY = "chief-alert-states-v1";
   const HISTORY_KEY = "chief-alert-history-v1";
+  const JOURNAL_KEY = "chief-journal-v1";
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const save = (key, value) => localStorage.setItem(key, JSON.stringify(value));
   const escape = value => String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
@@ -14,6 +15,7 @@ import { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } fr
     const list = read(WATCHLIST_KEY, []);
     const states = read(STATE_KEY, {});
     const history = read(HISTORY_KEY, []);
+    const journal = read(JOURNAL_KEY, []);
     for (const def of buildAlertDefinitions(list)) {
       const item = list.find(entry => entry.symbol === def.symbol && entry.id === def.planId);
       // Provider reference data have different instruments from XTB and never
@@ -44,7 +46,12 @@ import { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } fr
         <span>Level erreicht um ${escape(states[def.id].reachedAt)} · ${escape(states[def.id].lastSource)}</span>
         ${def.type === "accumulation" ? "<span>Nachkauf separat prüfen</span>" : `<label>${def.timeframe} Schlusskurs <input name="closePrice" type="number" step="any" required></label><button class="secondary compact" type="submit">Schluss bestätigen</button>`}</form>`).join("") : "<p>Kein ausgelöstes Level.</p>"}
       <p>${defs.length - reached.length - confirmed.length} weitere Level aktiv. Bereits bestätigte Level bleiben bis zu einer neuen Planversion dokumentiert.</p>
-      <h4>Alarmhistorie</h4><ol>${history.slice(0, 15).map(event => `<li>${escape(event.at)} · ${escape(event.alertId)} · ${escape(event.type)} · ${escape(event.price)}</li>`).join("") || "<li>Noch kein Ereignis</li>"}</ol></details>`;
+      <h4>Alarmhistorie</h4><ol>${history.slice(0, 15).map(event => `<li>${escape(event.at)} · ${escape(event.alertId)} · ${escape(event.type)} · ${escape(event.price)}
+        <label>Journal <select data-event-id="${escape(event.id)}"><option value="">Keine Zuordnung</option>${journal.map(entry => `<option value="${escape(entry.id)}" ${event.journalEntryId === entry.id ? "selected" : ""}>${escape(entry.input?.symbol)} · ${escape(entry.evaluation?.evaluatedAt)}</option>`).join("")}</select></label></li>`).join("") || "<li>Noch kein Ereignis</li>"}</ol></details>`;
+    panel.querySelectorAll("[data-event-id]").forEach(select => select.addEventListener("change", () => {
+      save(HISTORY_KEY, read(HISTORY_KEY, []).map(event => event.id === select.dataset.eventId
+        ? { ...event, journalEntryId: select.value || null } : event));
+    }));
     panel.querySelectorAll("form[data-alert-id]").forEach(form => form.addEventListener("submit", event => {
       event.preventDefault();
       const def = defs.find(item => item.id === form.dataset.alertId);

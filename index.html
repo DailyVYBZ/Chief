@@ -102,6 +102,7 @@
             <div id="watchlist-body" class="market-card-list"></div>
             <p class="import-help" id="import-message">CSV und JSON werden unterstützt. Gleiche Symbole und Richtungen werden ohne Duplikate aktualisiert.</p>
           </section>
+          <section class="panel" id="chief-macro" aria-label="Makro Ereignisse und Marktplan Prüfung"></section>
         </section>
 
         <section class="view" data-view-panel="setup">
@@ -179,6 +180,7 @@
           <section class="panel">
             <div class="table-wrap"><table><thead><tr><th>Setup</th><th>Datum</th><th>Entscheidung</th><th>Score</th><th>CRV</th><th>Stück</th><th></th></tr></thead><tbody id="journal-body"></tbody></table></div>
           </section>
+          <section class="panel" id="chief-positions" aria-label="Trade Ergebnisse und Portfolio Risiko"></section>
         </section>
       </main>
     </div>
@@ -192,5 +194,7 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script type="module" src="src/app.js"></script>
+  <script type="module" src="src/positions-ui.js"></script>
+  <script type="module" src="src/macro-ui.js"></script>
 </body>
 </html>

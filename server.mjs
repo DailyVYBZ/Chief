@@ -85,7 +85,7 @@ function safePath(pathname) {
   try { decoded = decodeURIComponent(pathname === "/" ? "/index.html" : pathname); }
   catch { return null; }
   // Never expose repository metadata, server code, configuration, or secrets.
-  if (!/^\/(index\.html|styles\.css|src\/(app|engine|watchlist|live|alerts|alerts-ui)\.js)$/.test(decoded)) return null;
+  if (!/^\/(index\.html|styles\.css|src\/(app|engine|watchlist|live|alerts|alerts-ui|positions-ui|portfolio|macro|macro-ui)\.js)$/.test(decoded)) return null;
   return resolve(root, `.${decoded}`);
 }
 

@@ -348,6 +348,7 @@ progress{width:100%;height:6px;border:0;border-radius:99px;overflow:hidden}progr
             <div id="watchlist-body" class="market-card-list"></div>
             <p class="import-help" id="import-message">CSV und JSON werden unterstützt. Gleiche Symbole und Richtungen werden ohne Duplikate aktualisiert.</p>
           </section>
+          <section class="panel" id="chief-macro" aria-label="Makro Ereignisse und Marktplan Prüfung"></section>
         </section>
 
         <section class="view" data-view-panel="setup">
@@ -425,6 +426,7 @@ progress{width:100%;height:6px;border:0;border-radius:99px;overflow:hidden}progr
           <section class="panel">
             <div class="table-wrap"><table><thead><tr><th>Setup</th><th>Datum</th><th>Entscheidung</th><th>Score</th><th>CRV</th><th>Stück</th><th></th></tr></thead><tbody id="journal-body"></tbody></table></div>
           </section>
+          <section class="panel" id="chief-positions" aria-label="Trade Ergebnisse und Portfolio Risiko"></section>
         </section>
       </main>
     </div>
@@ -863,9 +865,64 @@ function exportWatchlist(items) {
 
 return { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist };
 })();
+const ChiefMacro = (() => {
+const TYPES = new Set(["CPI", "FED", "EZB", "ARBEITSMARKT", "OEL", "KRYPTO"]);
+
+function createCatalyst({ id, type, scheduledAt, sourceUrl, markets, summary = "", risk = "normal" }) {
+  const at = new Date(scheduledAt);
+  if (!id || !TYPES.has(type) || Number.isNaN(at.getTime())) throw new Error("Ereigniskennung, Typ oder Zeitpunkt ungültig");
+  if (!/^https:\/\//.test(sourceUrl || "")) throw new Error("Quellenadresse fehlt");
+  if (!Array.isArray(markets) || !markets.length) throw new Error("Marktrelevanz fehlt");
+  return { id, type, scheduledAt: at.toISOString(), sourceUrl, markets: [...new Set(markets)], summary,
+    risk: risk === "high" ? "high" : "normal", publishedAt: null, observedAt: null };
+}
+
+function publishCatalyst(catalyst, { publishedAt, observedAt, summary, sourceUrl }) {
+  const published = new Date(publishedAt);
+  const observed = new Date(observedAt);
+  if (Number.isNaN(published.getTime()) || Number.isNaN(observed.getTime()) || observed < published)
+    throw new Error("Veröffentlichung und Abrufzeit müssen getrennt und gültig sein");
+  if (!/^https:\/\//.test(sourceUrl || catalyst.sourceUrl)) throw new Error("Quellenadresse fehlt");
+  return { ...catalyst, publishedAt: published.toISOString(), observedAt: observed.toISOString(),
+    summary: String(summary || catalyst.summary), sourceUrl: sourceUrl || catalyst.sourceUrl };
+}
+
+function applyCatalystToPlan(plan, catalyst) {
+  if (!catalyst.publishedAt || !catalyst.markets.includes(plan.symbol)) return plan;
+  // Preserve every technical field. A news event may demand review, never
+  // rewrite a level or assert a candle confirmation.
+  return { ...plan, reviewStatus: "review_required", reviewEventId: catalyst.id,
+    reviewRequestedAt: catalyst.publishedAt };
+}
+
+function journalContextAt({ plan, catalysts, referenceQuote, evaluatedAt }) {
+  const evaluated = new Date(evaluatedAt);
+  if (Number.isNaN(evaluated.getTime())) throw new Error("Bewertungszeit fehlt");
+  return {
+    evaluatedAt: evaluated.toISOString(), symbol: plan.symbol, planVersion: plan.planVersion,
+    reviewStatus: plan.reviewStatus || "current",
+    referenceQuote: referenceQuote && (!referenceQuote.timestamp || new Date(referenceQuote.timestamp) <= evaluated)
+      ? structuredClone(referenceQuote) : null,
+    catalysts: catalysts.filter(item => item.markets.includes(plan.symbol)
+      && new Date(item.scheduledAt) <= evaluated).map(item => {
+        const snapshot = structuredClone(item);
+        if (!snapshot.observedAt || new Date(snapshot.observedAt) > evaluated) {
+          snapshot.publishedAt = null;
+          snapshot.observedAt = null;
+          snapshot.summary = "";
+        }
+        return snapshot;
+      })
+  };
+}
+
+return { createCatalyst, publishCatalyst, applyCatalystToPlan, journalContextAt };
+})();
 (() => {
 const { evaluateSetup } = ChiefEngine;
+const { journalContextAt } = ChiefMacro;
 const { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist } = ChiefWatchlist;
+
 
 
 const form = document.querySelector("#setup-form");
@@ -963,7 +1020,16 @@ function loadJournal() {
 
 function saveEntry(input, evaluation) {
   const entries = loadJournal();
-  entries.unshift({ id: createId(), input, evaluation, status: "offen" });
+  let catalysts = [];
+  try { catalysts = JSON.parse(localStorage.getItem("chief-macro-events-v1")) || []; } catch {}
+  const market = loadWatchlist().find(item => item.symbol === input.symbol);
+  const relevantEvent = catalysts.filter(item => item.markets?.includes(input.symbol) && item.observedAt
+    && new Date(item.observedAt) <= new Date(evaluation.evaluatedAt)).at(-1);
+  const context = journalContextAt({ plan: { symbol: input.symbol, planVersion: market?.planVersion,
+    reviewStatus: relevantEvent ? "review_required" : "current" },
+    catalysts, referenceQuote: market ? { price: market.referencePrice, timestamp: market.priceAsOf,
+      source: market.quoteSource || "Manuell" } : null, evaluatedAt: evaluation.evaluatedAt });
+  entries.unshift({ id: createId(), input, evaluation, status: "offen", macroContext: context });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   renderJournal();
   renderDashboard();
@@ -1949,6 +2015,7 @@ const { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } = C
   const WATCHLIST_KEY = "chief-watchlist-v2";
   const STATE_KEY = "chief-alert-states-v1";
   const HISTORY_KEY = "chief-alert-history-v1";
+  const JOURNAL_KEY = "chief-journal-v1";
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const save = (key, value) => localStorage.setItem(key, JSON.stringify(value));
   const escape = value => String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
@@ -1959,6 +2026,7 @@ const { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } = C
     const list = read(WATCHLIST_KEY, []);
     const states = read(STATE_KEY, {});
     const history = read(HISTORY_KEY, []);
+    const journal = read(JOURNAL_KEY, []);
     for (const def of buildAlertDefinitions(list)) {
       const item = list.find(entry => entry.symbol === def.symbol && entry.id === def.planId);
       // Provider reference data have different instruments from XTB and never
@@ -1989,7 +2057,12 @@ const { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } = C
         <span>Level erreicht um ${escape(states[def.id].reachedAt)} · ${escape(states[def.id].lastSource)}</span>
         ${def.type === "accumulation" ? "<span>Nachkauf separat prüfen</span>" : `<label>${def.timeframe} Schlusskurs <input name="closePrice" type="number" step="any" required></label><button class="secondary compact" type="submit">Schluss bestätigen</button>`}</form>`).join("") : "<p>Kein ausgelöstes Level.</p>"}
       <p>${defs.length - reached.length - confirmed.length} weitere Level aktiv. Bereits bestätigte Level bleiben bis zu einer neuen Planversion dokumentiert.</p>
-      <h4>Alarmhistorie</h4><ol>${history.slice(0, 15).map(event => `<li>${escape(event.at)} · ${escape(event.alertId)} · ${escape(event.type)} · ${escape(event.price)}</li>`).join("") || "<li>Noch kein Ereignis</li>"}</ol></details>`;
+      <h4>Alarmhistorie</h4><ol>${history.slice(0, 15).map(event => `<li>${escape(event.at)} · ${escape(event.alertId)} · ${escape(event.type)} · ${escape(event.price)}
+        <label>Journal <select data-event-id="${escape(event.id)}"><option value="">Keine Zuordnung</option>${journal.map(entry => `<option value="${escape(entry.id)}" ${event.journalEntryId === entry.id ? "selected" : ""}>${escape(entry.input?.symbol)} · ${escape(entry.evaluation?.evaluatedAt)}</option>`).join("")}</select></label></li>`).join("") || "<li>Noch kein Ereignis</li>"}</ol></details>`;
+    panel.querySelectorAll("[data-event-id]").forEach(select => select.addEventListener("change", () => {
+      save(HISTORY_KEY, read(HISTORY_KEY, []).map(event => event.id === select.dataset.eventId
+        ? { ...event, journalEntryId: select.value || null } : event));
+    }));
     panel.querySelectorAll("form[data-alert-id]").forEach(form => form.addEventListener("submit", event => {
       event.preventDefault();
       const def = defs.find(item => item.id === form.dataset.alertId);
@@ -2023,6 +2096,299 @@ const { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } = C
 })();
 
 })();
+const ChiefPortfolio = (() => {
+const GROUPS = Object.freeze({
+  BITCOIN: "Krypto", ETHEREUM: "Krypto", SOLANA: "Krypto",
+  US100: "US Indizes", US500: "US Indizes", DE40: "DE40",
+  GOLD: "Edelmetalle", SILVER: "Edelmetalle", OIL: "Öl", EURUSD: "Forex"
+});
+
+function positive(value, name) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) throw new Error(`${name} muss positiv sein`);
+  return number;
+}
+
+function nonnegative(value, name) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) throw new Error(`${name} darf nicht negativ sein`);
+  return number;
+}
+
+// Explicit multiplier and FX rate avoid silently treating CFD points or USD
+// cash flows as EUR. The original setup and rule version stay as a snapshot.
+function openPosition({ setup, units, actualEntry, multiplier, fxEurPerCurrency, entryFeeEur = 0, openedAt }) {
+  if (!GROUPS[setup?.symbol]) throw new Error("Unbekanntes Instrument");
+  const entry = positive(actualEntry, "Einstieg");
+  const stop = positive(setup.stop, "Stop");
+  const direction = setup.direction;
+  if (direction !== "long" && direction !== "short") throw new Error("Richtung fehlt");
+  if (direction === "long" ? stop >= entry : stop <= entry) throw new Error("Stop liegt auf der falschen Seite");
+  const timestamp = new Date(openedAt);
+  if (Number.isNaN(timestamp.getTime())) throw new Error("Einstiegszeit fehlt");
+  return {
+    id: crypto.randomUUID(), setupSnapshot: structuredClone(setup), ruleVersion: setup.ruleVersion || setup.planVersion || null,
+    symbol: setup.symbol, direction, group: GROUPS[setup.symbol], units: positive(units, "Stückzahl"),
+    entry, stop, multiplier: positive(multiplier, "Kontraktfaktor"),
+    fxEurPerCurrency: positive(fxEurPerCurrency, "EUR Umrechnung"),
+    entryFeeEur: nonnegative(entryFeeEur, "Einstiegsgebühr"), openedAt: timestamp.toISOString(),
+    exits: [], ruleDeviation: null, review: ""
+  };
+}
+
+function positionResult(position) {
+  const closedUnits = position.exits.reduce((sum, exit) => sum + exit.units, 0);
+  const remainingUnits = Math.max(0, position.units - closedUnits);
+  const sign = position.direction === "long" ? 1 : -1;
+  const grossEur = position.exits.reduce((sum, exit) => sum + sign * (exit.price - position.entry)
+    * exit.units * position.multiplier * exit.fxEurPerCurrency, 0);
+  const allocatedEntryFees = position.entryFeeEur * closedUnits / position.units;
+  const exitFees = position.exits.reduce((sum, exit) => sum + exit.feeEur, 0);
+  const realizedEur = grossEur - allocatedEntryFees - exitFees;
+  const initialRiskPerUnitEur = Math.abs(position.entry - position.stop) * position.multiplier * position.fxEurPerCurrency;
+  const closedRiskEur = initialRiskPerUnitEur * closedUnits;
+  const openRiskEur = initialRiskPerUnitEur * remainingUnits;
+  const closedNotionalEur = position.entry * closedUnits * position.multiplier * position.fxEurPerCurrency;
+  return {
+    status: remainingUnits === 0 ? "closed" : "open", remainingUnits, closedUnits,
+    realizedEur, realizedPercent: closedNotionalEur ? realizedEur / closedNotionalEur * 100 : null,
+    realizedR: closedRiskEur ? realizedEur / closedRiskEur : null, openRiskEur
+  };
+}
+
+function recordExit(position, { units, price, fxEurPerCurrency, feeEur = 0, closedAt, target = null }) {
+  const quantity = positive(units, "Ausstiegsmenge");
+  if (quantity > positionResult(position).remainingUnits + 1e-9) throw new Error("Ausstieg übersteigt offene Menge");
+  const time = new Date(closedAt);
+  if (Number.isNaN(time.getTime()) || time.getTime() < new Date(position.openedAt).getTime()) throw new Error("Ausstiegszeit ungültig");
+  return {
+    ...position,
+    exits: [...position.exits, { units: quantity, price: positive(price, "Ausstieg"),
+      fxEurPerCurrency: positive(fxEurPerCurrency, "Ausstiegsumrechnung"),
+      feeEur: nonnegative(feeEur, "Ausstiegsgebühr"), closedAt: time.toISOString(), target }]
+  };
+}
+
+function portfolioRisk(positions, { portfolioEur, maxRiskPercent, proposed = null }) {
+  const portfolio = positive(portfolioEur, "Portfolio");
+  const limit = nonnegative(maxRiskPercent, "Risikolimit") / 100 * portfolio;
+  const open = positions.filter(position => positionResult(position).remainingUnits > 0);
+  const totalRiskEur = open.reduce((sum, position) => sum + positionResult(position).openRiskEur, 0);
+  const byGroup = Object.fromEntries([...new Set(open.map(position => position.group))].map(group => [group,
+    open.filter(position => position.group === group).reduce((sum, position) => sum + positionResult(position).openRiskEur, 0)]));
+  const proposedRiskEur = proposed ? positionResult(proposed).openRiskEur : 0;
+  return {
+    totalRiskEur, totalRiskPercent: totalRiskEur / portfolio * 100,
+    byGroup, concentrationGroups: Object.keys(byGroup).filter(group => open.filter(p => p.group === group).length > 1),
+    availableRiskEur: Math.max(0, limit - totalRiskEur),
+    proposedRiskEur, projectedRiskEur: totalRiskEur + proposedRiskEur,
+    exceedsLimit: totalRiskEur + proposedRiskEur > limit
+  };
+}
+
+function journalStatistics(positions) {
+  const closed = positions.filter(position => positionResult(position).status === "closed");
+  const sum = closed.reduce((result, position) => {
+    const outcome = positionResult(position);
+    result.realizedEur += outcome.realizedEur;
+    result.totalR += outcome.realizedR;
+    result.wins += outcome.realizedEur > 0 ? 1 : 0;
+    result.ruleCompliant += position.ruleDeviation === false ? 1 : 0;
+    result.ruleReviewed += typeof position.ruleDeviation === "boolean" ? 1 : 0;
+    return result;
+  }, { realizedEur: 0, totalR: 0, wins: 0, ruleCompliant: 0, ruleReviewed: 0 });
+  return { closedTrades: closed.length, realizedEur: sum.realizedEur,
+    winRatePercent: closed.length ? sum.wins / closed.length * 100 : null,
+    averageR: closed.length ? sum.totalR / closed.length : null,
+    ruleCompliancePercent: sum.ruleReviewed ? sum.ruleCompliant / sum.ruleReviewed * 100 : null,
+    ruleReviewed: sum.ruleReviewed };
+}
+
+return { openPosition, recordExit, positionResult, portfolioRisk, journalStatistics };
+})();
+(() => {
+const { openPosition, recordExit, positionResult, portfolioRisk, journalStatistics } = ChiefPortfolio;
+
+const KEY = "chief-positions-v1";
+const SETTINGS = "chief-risk-settings-v1";
+const JOURNAL = "chief-journal-v1";
+const panel = document.querySelector("#chief-positions");
+const eur = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
+const dec = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+const escape = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+const read = (key, fallback) => {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+};
+const save = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+const positions = () => read(KEY, []);
+const errorMessage = error => { document.querySelector("#position-error").textContent = error.message; };
+
+function render() {
+  if (!panel) return;
+  const list = positions();
+  const journal = read(JOURNAL, []);
+  const linked = new Set(list.map(position => position.journalEntryId));
+  const available = journal.filter(entry => !linked.has(entry.id) && entry.input?.symbol);
+  const settings = read(SETTINGS, { portfolioEur: 120000, maxRiskPercent: 2 });
+  let risk;
+  try { risk = portfolioRisk(list, settings); } catch { risk = null; }
+  const stats = journalStatistics(list);
+  panel.innerHTML = `<h3>Trades und Portfolio Risiko</h3>
+    <p>Trage nur tatsächlich ausgeführte Trades ein. Kontraktfaktor und EUR Umrechnung stammen aus deiner Brokerabrechnung. Die Risikogruppen zeigen gemeinsame Expositionen, keine gemessene Korrelation.</p>
+    <form id="risk-settings" class="form-grid two">
+      <label>Portfoliowert EUR<input name="portfolioEur" type="number" step="any" min="0.01" required value="${escape(settings.portfolioEur)}"></label>
+      <label>Maximales Gesamtrisiko %<input name="maxRiskPercent" type="number" step="any" min="0" required value="${escape(settings.maxRiskPercent)}"></label>
+      <button class="secondary compact" type="submit">Risikolimit speichern</button>
+    </form>
+    <p aria-live="polite">Offenes Risiko: ${risk ? eur.format(risk.totalRiskEur) : "Eingabe prüfen"} ${risk ? `(${dec.format(risk.totalRiskPercent)} %) · Weiteres Risiko: ${eur.format(risk.availableRiskEur)}` : ""}</p>
+    <p>Risikogruppen: ${risk && Object.keys(risk.byGroup).length ? Object.entries(risk.byGroup).map(([group, value]) => `${escape(group)} ${eur.format(value)}`).join(" · ") : "keine offenen Positionen"}</p>
+    <p>${risk?.concentrationGroups.length ? `Mehrere Positionen: ${risk.concentrationGroups.map(escape).join(", ")}` : "Keine mehrfach besetzte Risikogruppe"}</p>
+    <p>Geschlossen: ${stats.closedTrades} · Ergebnis: ${eur.format(stats.realizedEur)} · Trefferquote: ${stats.winRatePercent === null ? "offen" : `${dec.format(stats.winRatePercent)} %`} · Ø R: ${stats.averageR === null ? "offen" : dec.format(stats.averageR)} · Regeltreue: ${stats.ruleCompliancePercent === null ? "nicht bewertet" : `${dec.format(stats.ruleCompliancePercent)} % (${stats.ruleReviewed} geprüft)`}</p>
+    <details><summary>Tatsächlichen Einstieg erfassen</summary>
+      <form id="position-open" class="form-grid three">
+        <label>Journalentscheidung<select name="journalEntryId" required>${available.map(entry => `<option value="${escape(entry.id)}">${escape(entry.input.symbol)} · ${escape(new Date(entry.evaluation.evaluatedAt).toLocaleDateString("de-DE"))}</option>`).join("")}</select></label>
+        <label>Stückzahl oder Lots<input name="units" type="number" step="any" min="0.000001" required></label>
+        <label>Tatsächlicher Einstieg<input name="actualEntry" type="number" step="any" min="0.000001" required></label>
+        <label>Kontraktfaktor<input name="multiplier" type="number" step="any" min="0.000001" required></label>
+        <label>EUR je Kurswährung<input name="fxEurPerCurrency" type="number" step="any" min="0.000001" required></label>
+        <label>Einstiegsgebühr EUR<input name="entryFeeEur" type="number" step="any" min="0" value="0" required></label>
+        <label>Tatsächlicher Zeitpunkt<input name="openedAt" type="datetime-local" required></label>
+        <output id="proposed-risk" aria-live="polite">Vorschau nach Eingabe</output>
+        <button class="primary compact" type="submit" ${available.length ? "" : "disabled"}>Trade erfassen</button>
+      </form>${available.length ? "" : "<p>Speichere zuerst eine Setup Bewertung im Decision Journal.</p>"}
+    </details>
+    <h4>Positionen</h4>${list.map(position => {
+      const result = positionResult(position);
+      return `<details><summary>${escape(position.symbol)} · ${result.status === "closed" ? "geschlossen" : "offen"} · ${dec.format(result.remainingUnits)} verbleibend · ${eur.format(result.realizedEur)}</summary>
+        <p>Einstieg ${dec.format(position.entry)} · Stop ${dec.format(position.stop)} · Regelversion ${escape(position.ruleVersion || "ohne")}</p>
+        ${result.remainingUnits ? `<form data-exit="${escape(position.id)}" class="form-grid three">
+          <label>Ausstiegsmenge<input name="units" type="number" step="any" min="0.000001" max="${result.remainingUnits}" required></label>
+          <label>Ausstiegskurs<input name="price" type="number" step="any" min="0.000001" required></label>
+          <label>EUR je Kurswährung<input name="fxEurPerCurrency" type="number" step="any" min="0.000001" required></label>
+          <label>Ausstiegsgebühr EUR<input name="feeEur" type="number" step="any" min="0" value="0" required></label>
+          <label>Erreichtes Ziel<input name="target" placeholder="z. B. TP1"></label>
+          <button class="secondary compact" type="submit">Teilverkauf oder Abschluss</button>
+        </form>` : `<p>Ergebnis ${dec.format(result.realizedPercent)} % · ${dec.format(result.realizedR)} R</p>
+        <form data-review="${escape(position.id)}"><label>Regeltreue <select name="ruleDeviation"><option value="">Noch ungeprüft</option><option value="false" ${position.ruleDeviation === false ? "selected" : ""}>Regeln eingehalten</option><option value="true" ${position.ruleDeviation === true ? "selected" : ""}>Abweichung</option></select></label>
+          <label>Nachbetrachtung<textarea name="review" rows="2">${escape(position.review)}</textarea></label><button class="secondary compact" type="submit">Nachbetrachtung speichern</button></form>`}</details>`;
+    }).join("") || "<p>Noch kein ausgeführter Trade erfasst.</p>"}
+    <p id="position-error" role="alert"></p>`;
+  panel.querySelector("#risk-settings").addEventListener("submit", event => {
+    event.preventDefault();
+    const input = Object.fromEntries(new FormData(event.target));
+    try { portfolioRisk(positions(), input); save(SETTINGS, input); render(); } catch (error) { errorMessage(error); }
+  });
+  panel.querySelector("#position-open").addEventListener("submit", event => {
+    event.preventDefault();
+    const input = Object.fromEntries(new FormData(event.target));
+    const entry = read(JOURNAL, []).find(item => item.id === input.journalEntryId);
+    try {
+      if (!entry || positions().some(item => item.journalEntryId === entry.id)) throw new Error("Journalentscheidung fehlt oder wurde bereits verwendet");
+      const position = openPosition({ ...input, setup: { ...entry.input, ruleVersion: entry.evaluation.ruleVersion } });
+      const next = { ...position, journalEntryId: entry.id };
+      save(KEY, [next, ...positions()]); render();
+    } catch (error) { errorMessage(error); }
+  });
+  panel.querySelector("#position-open").addEventListener("input", event => {
+    const output = panel.querySelector("#proposed-risk");
+    const input = Object.fromEntries(new FormData(event.currentTarget));
+    const entry = journal.find(item => item.id === input.journalEntryId);
+    try {
+      const proposed = openPosition({ ...input, setup: entry.input });
+      const preview = portfolioRisk(list, { ...settings, proposed });
+      output.textContent = `Neues Risiko ${eur.format(preview.proposedRiskEur)} · danach ${eur.format(preview.projectedRiskEur)}${preview.exceedsLimit ? " · Risikolimit überschritten" : ""}`;
+    } catch { output.textContent = "Vorschau nach vollständiger Eingabe"; }
+  });
+  panel.querySelectorAll("[data-exit]").forEach(form => form.addEventListener("submit", event => {
+    event.preventDefault();
+    const input = Object.fromEntries(new FormData(form));
+    try {
+      const next = positions().map(position => position.id === form.dataset.exit
+        ? recordExit(position, { ...input, closedAt: new Date().toISOString() }) : position);
+      save(KEY, next); render();
+    } catch (error) { errorMessage(error); }
+  }));
+  panel.querySelectorAll("[data-review]").forEach(form => form.addEventListener("submit", event => {
+    event.preventDefault();
+    const input = Object.fromEntries(new FormData(form));
+    save(KEY, positions().map(position => position.id === form.dataset.review ? { ...position,
+      ruleDeviation: input.ruleDeviation === "" ? null : input.ruleDeviation === "true", review: input.review } : position));
+    render();
+  }));
+}
+
+if (panel) {
+  document.addEventListener("click", event => { if (event.target?.id === "save-entry") setTimeout(render, 0); });
+  window.addEventListener("storage", event => { if ([KEY, SETTINGS, JOURNAL].includes(event.key)) render(); });
+  render();
+}
+
+})();
+(() => {
+const { createCatalyst, publishCatalyst } = ChiefMacro;
+
+const KEY = "chief-macro-events-v1";
+const panel = document.querySelector("#chief-macro");
+const symbols = ["SILVER", "GOLD", "DE40", "US100", "US500", "OIL", "SOLANA", "BITCOIN", "ETHEREUM", "EURUSD"];
+const escape = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+const read = () => { try { const value = JSON.parse(localStorage.getItem(KEY)); return Array.isArray(value) ? value : []; } catch { return []; } };
+const save = events => localStorage.setItem(KEY, JSON.stringify(events));
+
+function render() {
+  if (!panel) return;
+  const events = read();
+  const pending = [...new Set(events.filter(event => event.publishedAt).flatMap(event => event.markets))];
+  panel.innerHTML = `<h3>Makro Kontext</h3><p>Ereignisse dokumentieren Quellen und Marktbezug. Ein Ereignis fordert eine Prüfung an, es ändert keinen Trigger, Stop oder Kerzenschluss.</p>
+    <p>Prüfpflichtig nach Ereignis: ${pending.length ? pending.map(escape).join(", ") : "kein Markt"}. Eine Prüfung wird separat dokumentiert.</p>
+    <details><summary>Ereignis erfassen</summary><form id="macro-create" class="form-grid three">
+      <label>Kennung<input name="id" required placeholder="z. B. FED-2026-09-16"></label>
+      <label>Typ<select name="type">${["CPI", "FED", "EZB", "ARBEITSMARKT", "OEL", "KRYPTO"].map(x => `<option>${x}</option>`).join("")}</select></label>
+      <label>Geplanter Zeitpunkt<input name="scheduledAt" type="datetime-local" required></label>
+      <label>Primärquelle HTTPS<input name="sourceUrl" type="url" pattern="https://.*" required></label>
+      <label>Ereignisrisiko<select name="risk"><option value="normal">Normal</option><option value="high">Erhöht</option></select></label>
+      <fieldset><legend>Betroffene Märkte</legend>${symbols.map(symbol => `<label><input name="markets" type="checkbox" value="${symbol}">${symbol}</label>`).join("")}</fieldset>
+      <button class="secondary compact" type="submit">Ereignis speichern</button>
+    </form></details>
+    <h4>Ereignisse</h4>${events.map(event => `<details><summary>${escape(event.type)} · ${escape(event.id)} · ${escape(event.scheduledAt)} · ${event.publishedAt ? "prüfpflichtig" : "geplant"}</summary>
+      <p>${event.markets.map(escape).join(", ")} · <a href="${escape(event.sourceUrl)}" target="_blank" rel="noopener noreferrer">Quelle</a></p>
+      ${event.publishedAt ? `<p>Veröffentlicht ${escape(event.publishedAt)} · Erfasst ${escape(event.observedAt)} · ${escape(event.summary)}</p>` : `<form data-publish="${escape(event.id)}" class="form-grid three">
+        <label>Veröffentlichung<input name="publishedAt" type="datetime-local" required></label>
+        <label>Eigener Abruf<input name="observedAt" type="datetime-local" required></label>
+        <label>Ergebnis<input name="summary" required></label>
+        <label>Quellenadresse<input name="sourceUrl" type="url" pattern="https://.*" required value="${escape(event.sourceUrl)}"></label>
+        <button class="secondary compact" type="submit">Veröffentlichung erfassen</button></form>`}</details>`).join("") || "<p>Keine Ereignisse erfasst.</p>"}
+    <p id="macro-error" role="alert"></p>`;
+  const error = message => { panel.querySelector("#macro-error").textContent = message; };
+  panel.querySelector("#macro-create").addEventListener("submit", e => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const input = Object.fromEntries(new FormData(form));
+    input.markets = [...form.querySelectorAll('[name="markets"]:checked')].map(node => node.value);
+    try {
+      if (read().some(event => event.id === input.id)) throw new Error("Kennung existiert bereits");
+      const next = createCatalyst(input);
+      save([...read(), next]); render();
+    } catch (exception) { error(exception.message); }
+  });
+  panel.querySelectorAll("[data-publish]").forEach(form => form.addEventListener("submit", e => {
+    e.preventDefault();
+    try {
+      const input = Object.fromEntries(new FormData(form));
+      const event = read().find(item => item.id === form.dataset.publish);
+      const published = publishCatalyst(event, input);
+      const next = read().map(item => item.id === published.id ? published : item);
+      save(next); render();
+    } catch (exception) { error(exception.message); }
+  }));
+}
+
+if (panel) {
+  window.addEventListener("storage", event => { if (event.key === KEY) render(); });
+  render();
+}
+
+})();
 </script>
+
 </body>
 </html>

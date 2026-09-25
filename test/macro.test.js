@@ -26,3 +26,13 @@ test("event sources and distinct published and observed timestamps are required"
   assert.throws(() => publishCatalyst(event, { publishedAt: "2026-09-16T14:00:00Z",
     observedAt: "2026-09-16T13:59:00Z" }), /getrennt/);
 });
+
+test("historical journal context does not disclose later observed event results", () => {
+  const event = publishCatalyst(createCatalyst({ id: "FED-2", type: "FED", scheduledAt: "2026-09-16T18:00:00Z",
+    markets: ["US100"], sourceUrl: "https://www.federalreserve.gov/" }),
+  { publishedAt: "2026-09-16T18:00:00Z", observedAt: "2026-09-16T18:10:00Z", summary: "Result" });
+  const earlier = journalContextAt({ plan: { symbol: "US100" }, catalysts: [event],
+    evaluatedAt: "2026-09-16T18:05:00Z" });
+  assert.equal(earlier.catalysts[0].observedAt, null);
+  assert.equal(earlier.catalysts[0].publishedAt, null);
+});

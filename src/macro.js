@@ -33,8 +33,17 @@ export function journalContextAt({ plan, catalysts, referenceQuote, evaluatedAt 
   return {
     evaluatedAt: evaluated.toISOString(), symbol: plan.symbol, planVersion: plan.planVersion,
     reviewStatus: plan.reviewStatus || "current",
-    referenceQuote: referenceQuote ? structuredClone(referenceQuote) : null,
+    referenceQuote: referenceQuote && (!referenceQuote.timestamp || new Date(referenceQuote.timestamp) <= evaluated)
+      ? structuredClone(referenceQuote) : null,
     catalysts: catalysts.filter(item => item.markets.includes(plan.symbol)
-      && new Date(item.scheduledAt) <= evaluated).map(item => structuredClone(item))
+      && new Date(item.scheduledAt) <= evaluated).map(item => {
+        const snapshot = structuredClone(item);
+        if (!snapshot.observedAt || new Date(snapshot.observedAt) > evaluated) {
+          snapshot.publishedAt = null;
+          snapshot.observedAt = null;
+          snapshot.summary = "";
+        }
+        return snapshot;
+      })
   };
 }
