@@ -155,6 +155,9 @@ export function normalizeWatchlistItem(item, index = 0) {
     source: String(item.source || "Import").trim(),
     planDate: item.planDate || "",
     priceAsOf: item.priceAsOf || "",
+    quoteSource: String(item.quoteSource || "").trim(),
+    quoteProviderSymbol: String(item.quoteProviderSymbol || "").trim(),
+    quoteAuthoritative: item.quoteAuthoritative === true,
     planStatus: item.planStatus === "validated" ? "validated" : "historical",
     planVersion: Number(item.planVersion) || 1,
     confirmation: String(item.confirmation || "").trim(),
@@ -202,6 +205,8 @@ export function groupWatchlist(items) {
         source: item.source,
         planDate: item.planDate,
         priceAsOf: item.priceAsOf,
+        quoteSource: item.quoteSource,
+        quoteProviderSymbol: item.quoteProviderSymbol,
         accumulationLevels: [],
         long: null,
         short: null,
@@ -218,6 +223,8 @@ export function groupWatchlist(items) {
     group.source = item.source || group.source;
     group.planDate = item.planDate || group.planDate;
     group.priceAsOf = item.priceAsOf || group.priceAsOf;
+    group.quoteSource = item.quoteSource || group.quoteSource;
+    group.quoteProviderSymbol = item.quoteProviderSymbol || group.quoteProviderSymbol;
     group.missingPlanReason = item.missingPlanReason || group.missingPlanReason;
     group.accumulationLevels = [...new Set([...group.accumulationLevels, ...item.accumulationLevels])];
     group[item.direction === "short" ? "short" : "long"] = item;

@@ -6,4 +6,6 @@ Eine Bestätigung ist nur für Long und Short möglich. Sie benötigt den im Pla
 
 Yahoo Finanzdaten für Index und Rohstoff Stellvertreter sowie CoinGecko Kryptokurse stimmen nicht zwingend mit XTB CFD Kursen überein. Die automatische Referenzkurs Übernahme löst darum keinen exakten Alarm aus. Für echte automatische Alarme ist ein autoritativer, instrumentgleicher Provider nötig. Ein manueller Schlusskurs wird vom Nutzer bestätigt und ist keine automatische Kerzendaten Prüfung.
 
+Auch der separate manuelle XTB CSV Import löst keinen Alarm aus, weil Chief die Herkunft und korrekte Instrumentkennung der Datei nicht automatisch beweisen kann. Ein anschließend manuell gesetzter Watchlist Kurs kann ein Level als erreicht markieren; die H1/H4 Bestätigung bleibt eine eigene Handlung.
+
 Der tatsächliche Kerzenschlusszeitpunkt muss eingegeben werden. Zukünftige Schlüsse sowie Schlüsse älter als 24 Stunden werden abgewiesen. Die Alarmhistorie mit gespeicherten Journalzuordnungen und die HTML Maskierung werden durch einen Rendering Regressionstest geprüft; dieser ersetzt keinen Browser E2E Test.

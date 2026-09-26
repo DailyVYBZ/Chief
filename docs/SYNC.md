@@ -1,0 +1,11 @@
+# Geräteabgleich
+
+Der Chief Server hält Watchlist, Journal, Positionen, Risikoeinstellungen, Makroereignisse und Alarmzustände in einem versionierten lokalen Workspace. Beim ersten Klick auf **Abgleichen** wird der lokale Stand auf einem leeren Server gespeichert; auf einem bereits belegten Server erscheint zuerst ein Konflikt. Nach einem erfolgreichen Abgleich prüft Chief alle 30 Sekunden auf Änderungen, solange die Seite sichtbar ist. Bei zwei konkurrierenden Änderungen erscheint ein Konflikt; Chief überschreibt keinen Stand automatisch. Vor der gewählten Übernahme wird die andere Version als JSON heruntergeladen.
+
+Der Server bindet standardmäßig nur an `127.0.0.1`. Auf demselben PC können damit mehrere Browser denselben Workspace nutzen. Die portable Einzeldatei bleibt offline und besitzt keinen Serverabgleich.
+
+Der Abgleich synchronisiert die fachlichen Daten. Live Provider Cache, Kurs Snapshots und der pro Gerät gewählte Live Modus bleiben lokal. Ein Workspace Backup im Command Center sichert diese zusätzlich als JSON.
+
+Für ein Smartphone im lokalen Netz müssen `CHIEF_HOST`, `CHIEF_SYNC_TOKEN`, `CHIEF_TLS_KEY_PATH` und `CHIEF_TLS_CERT_PATH` vor dem Start gesetzt werden. Chief startet bei Netzwerkfreigabe ohne Zugriffscode und vertrauenswürdiges TLS Zertifikat nicht. Das Zertifikat muss für die Adresse gültig sein, die das Smartphone öffnet. Der Zugriffscode bleibt nur für die Browsersitzung gespeichert. Es wurde kein Cloud Dienst eingerichtet.
+
+Der Serverstand liegt standardmäßig unter `.chief-data/workspace.json` und wird nicht in Git eingecheckt. Vor einem Gerätewechsel zuerst auf dem bisherigen Gerät **Abgleichen**, dann auf dem zweiten Gerät **Serverstand übernehmen**. Ein initialer Konflikt auf dem zweiten Gerät ist beabsichtigt, weil dessen lokale Startdaten vom bestehenden Workspace abweichen.

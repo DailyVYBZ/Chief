@@ -4,6 +4,8 @@
   const ALERT_STATES_KEY = "chief-alert-states-v1";
   const ALERT_HISTORY_KEY = "chief-alert-history-v1";
   const MACRO_EVENTS_KEY = "chief-macro-events-v1";
+  const POSITIONS_KEY = "chief-positions-v1";
+  const RISK_SETTINGS_KEY = "chief-risk-settings-v1";
   const LIVE_QUOTES_KEY = "chief-live-quotes-v1";
   const SNAPSHOTS_KEY = "chief-market-snapshots-v1";
   const MANUAL_ANCHOR_KEY = "chief-live-manual-anchor-v1";
@@ -468,6 +470,8 @@
       alertStates: loadJson(ALERT_STATES_KEY, {}),
       alertHistory: loadJson(ALERT_HISTORY_KEY, []),
       macroEvents: loadJson(MACRO_EVENTS_KEY, []),
+      positions: loadJson(POSITIONS_KEY, []),
+      riskSettings: loadJson(RISK_SETTINGS_KEY, {}),
       liveQuotes: state.quotes,
       snapshots: loadJson(SNAPSHOTS_KEY, []),
       manualAnchor: loadJson(MANUAL_ANCHOR_KEY, null),

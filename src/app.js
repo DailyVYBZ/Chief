@@ -246,6 +246,7 @@ function marketCard(market, signal) {
         <label class="market-price">Referenzkurs
           <input class="table-input" type="number" step="any" value="${market.referencePrice || ""}" data-market-price="${escapeHtml(market.symbol)}" aria-label="Referenzkurs für ${escapeHtml(market.symbol)}">
           <small>${formatDateTime(market.priceAsOf)}</small>
+          <small>${escapeHtml(market.quoteSource || "Manuell")} ${escapeHtml(market.quoteProviderSymbol || "")} · Ask ${market.askPrice ? number.format(market.askPrice) : "nicht verfügbar"}</small>
         </label>
         <div class="market-state-box"><span class="badge ${signal.tone}">${signal.label}</span><small>${signal.distancePercent === undefined ? "" : `${compactNumber.format(signal.distancePercent)} % bis Level`}</small></div>
       </header>
@@ -285,7 +286,7 @@ function bindWatchlistActions(root) {
     const timestamp = new Date().toISOString();
     const updated = loadWatchlist().map(item => {
       if (item.symbol !== symbol) return item;
-      const manual = { ...item, referencePrice: newPrice, priceAsOf: timestamp };
+      const manual = { ...item, referencePrice: newPrice, askPrice: 0, priceAsOf: timestamp };
       delete manual.quoteSource;
       delete manual.quoteProviderSymbol;
       delete manual.quoteAuthoritative;

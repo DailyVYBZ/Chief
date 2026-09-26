@@ -25,7 +25,7 @@ Chief 0.5 ergänzt einen lokalen Node Server und ein Live Command Center.
 * Live Vergleich standardmäßig ohne Veränderung deiner XTB Referenzkurse
 * Optionaler Live Referenzmodus mit automatischer Rückkehr zum vorherigen XTB Kursstand
 * Kurs Snapshots vor automatischen Änderungen
-* Workspace Backup mit Watchlist, Journal, Alarmzuständen, Alarmhistorie, Makro Ereignissen, Live Kursen und Snapshots
+* Workspace Backup mit Watchlist, Journal, Positionen, Risikoeinstellungen, Alarmzuständen, Alarmhistorie, Makro Ereignissen, Live Kursen und Snapshots
 * Top drei Märkte nach Trigger oder Nachkaufnähe im Command Center
 * Tastenkürzel `R` für Kursabruf und `/` für die Watchlist Suche
 
@@ -33,7 +33,7 @@ Die öffentlichen Provider Kurse sind Referenzwerte und können von XTB CFD Kurs
 
 ## Alarmmodell
 
-Chief verwaltet Long, Short und Krypto Nachkauflevel getrennt. Ein manuell gepflegter Kurs kann den Zustand `Level erreicht` auslösen. Ein H1 oder H4 Schluss erfordert eine zusätzliche manuelle Bestätigung mit Schlusskurs. Doppelte Meldungen bei unverändertem Plan werden unterdrückt. Die letzten 200 Zustandsereignisse liegen lokal im Browser und besitzen eine spätere Journal Zuordnung. Öffentliche Provider Kurse lösen wegen der Abweichung zu XTB keine exakten Alarme aus. Siehe `docs/ALERTS.md`.
+Chief verwaltet Long, Short und Krypto Nachkauflevel getrennt. Ein manuell gepflegter Kurs kann den Zustand `Level erreicht` auslösen. Ein H1 oder H4 Schluss erfordert eine zusätzliche manuelle Bestätigung mit Schlusskurs. Doppelte Meldungen bei unverändertem Plan werden unterdrückt. Die letzten 200 Zustandsereignisse liegen im Browser und können über den lokalen Chief Server versioniert abgeglichen werden. Öffentliche Provider Kurse lösen wegen der Abweichung zu XTB keine exakten Alarme aus. Siehe `docs/ALERTS.md` und `docs/SYNC.md`.
 
 ## Aktiver Marktplan
 
@@ -101,6 +101,8 @@ npm test
 * Live Vergleich und optionaler Live Referenzmodus
 * Provider Cache, Timeout und Krypto Fallback
 * Migration des bisherigen lokalen Watchlist Bestands auf Version 2
+* Versionierter Geräteabgleich über den lokalen Chief Server mit Konflikterkennung; Anleitung unter `docs/SYNC.md`
+* Separater manueller Import von XTB Bid und optionalem Ask mit Instrumentkennung und Zeitstempel
 * Responsive Oberfläche für Smartphone und Desktop
 * Portable Einzeldatei für Windows und andere Desktop Systeme
 * GitHub Actions Tests und portable Builds

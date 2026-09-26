@@ -48,6 +48,10 @@ Symbolmapping:
 
 Dient als Fallback für Bitcoin, Ethereum und Solana. Optional kann `COINGECKO_DEMO_API_KEY` gesetzt werden.
 
+### XTB Kurse
+
+XTB hat die öffentliche xAPI am 14.03.2025 abgeschaltet ([XTB Mitteilung](https://www.xtb.com/int/company-news?cur=109&p_p_col_count=1&p_p_col_id=column-2&p_p_id=101_INSTANCE_bvR2&p_p_lifecycle=0&p_p_mode=view&p_p_state=normal&p_r_p_564233524_resetCur=false&page=72)). Chief ruft deshalb keine inoffiziellen xStation Endpunkte ab. In der Watchlist kann eine selbst erstellte CSV mit `symbol;instrument;bid;ask;quotedAt` importiert werden. Instrumentkennung und Zeitpunkt müssen aus dem passenden XTB Instrument stammen. Der Import ändert ausschließlich Kurs, Ask, Zeitstempel und Kursquelle; er bestätigt keinen Alarm automatisch. CSV mit deutschem Dezimalformat verwendet Semikolon.
+
 ## API
 
 `GET /api/health`
@@ -71,11 +75,11 @@ Jeder Kurs enthält mindestens Symbol, Provider Symbol, Preis, Zeitstempel, Quel
 * Teilabdeckung wird explizit gemeldet
 * Ein fehlerhafter Provider überschreibt keine Triggerlogik
 * Externe Kurse verändern keine Planparameter
-* Workspace Backup enthält Watchlist, Journal, Alarmzustände, Alarmhistorie, Makro Ereignisse, Live Kurse und Snapshots. Es ist ein Export, kein geräteübergreifender Sync oder automatischer Import.
+* Workspace Backup enthält Watchlist, Journal, Positionen, Risikoeinstellungen, Alarmzustände, Alarmhistorie, Makro Ereignisse, Live Kurse und Snapshots. Es ist ein Export. Der versionierte Geräteabgleich ist separat unter `docs/SYNC.md` beschrieben.
 * Portable Datei schaltet den automatischen Live Referenzmodus ab
 * Kurse ohne echten Provider Zeitstempel und Kurse älter als 24 Stunden werden verworfen; Zeitstempel aus der Zukunft über fünf Minuten ebenso
 * Teilweise fehlgeschlagene Abrufe behalten den letzten gespeicherten Wert, kennzeichnen ihn nach Ablauf der Frist aber nicht als frisch
-* Der Server bindet standardmäßig nur an `127.0.0.1`. Für einen bewusst freigegebenen Host kann `CHIEF_HOST` gesetzt werden
+* Der Server bindet standardmäßig nur an `127.0.0.1`. Für einen bewusst freigegebenen Host sind `CHIEF_HOST`, `CHIEF_SYNC_TOKEN` und ein vertrauenswürdiges TLS Zertifikat erforderlich; siehe `docs/SYNC.md`
 * Der HTTP Server liefert ausschließlich die benötigten Oberflächendateien aus. Repository Daten, Konfiguration und Servercode bleiben unerreichbar
 
 Die Provider sind über `server/quote-service.mjs` registriert. Jeder Adapter bietet `name`, `supports(symbol)` und `fetch(symbol)` und liefert das normalisierte Kursmodell. Ein weiterer Adapter lässt sich in der Serverregistrierung ergänzen. Bei einem Fehler versucht Chief den nächsten Adapter für dieses Symbol.
