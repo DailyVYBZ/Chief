@@ -8,6 +8,7 @@ import {
   getWatchlistSignal,
   groupWatchlist,
   mergeWatchlists,
+  migrateLegacyWatchlist,
   parseLocaleNumber,
   parseWatchlist
 } from "../src/watchlist.js";
@@ -77,6 +78,23 @@ test("führt gleiche Symbole und Richtungen ohne Duplikat zusammen", () => {
   const merged = mergeWatchlists([{ ...bitcoin, entry: 78000 }], [{ ...bitcoin, entry: 78950 }]);
   assert.equal(merged.length, 1);
   assert.equal(merged[0].entry, 78950);
+});
+
+test("Migration bewahrt vorhandene Pläne und ergänzt fehlende Startszenarien", () => {
+  const bitcoin = ACTIVE_WATCHLIST.find(item => item.symbol === "BITCOIN" && item.direction === "long");
+  const migrated = migrateLegacyWatchlist([{ ...bitcoin, id: "saved", trigger: 80000, referencePrice: 79500 }]);
+  assert.equal(migrated.length, ACTIVE_WATCHLIST.length);
+  assert.equal(migrated.find(item => item.symbol === "BITCOIN" && item.direction === "long").trigger, 80000);
+  assert.equal(migrated.find(item => item.symbol === "BITCOIN" && item.direction === "long").id, bitcoin.id);
+  assert.ok(migrated.some(item => item.symbol === "BITCOIN" && item.direction === "short"));
+});
+
+test("veraltete oder zukünftige Kryptokurse erzeugen auch kein Nachkaufsignal", () => {
+  const bitcoin = groupWatchlist(ACTIVE_WATCHLIST).find(item => item.symbol === "BITCOIN");
+  bitcoin.referencePrice = bitcoin.accumulationLevels[0] - 1;
+  assert.equal(getMarketSignal(bitcoin, new Date("2026-09-13T14:00:00Z")).label, "DATEN ALT");
+  bitcoin.priceAsOf = "2026-09-13T14:10:00Z";
+  assert.equal(getMarketSignal(bitcoin, new Date("2026-09-13T14:00:00Z")).label, "DATEN ALT");
 });
 
 test("erkennt Bitcoin Long als sehr nahen Trigger", () => {

@@ -1,4 +1,5 @@
 import { evaluateSetup } from "./engine.js";
+import { journalContextAt } from "./macro.js";
 import {
   ACTIVE_WATCHLIST,
   WATCHLIST_VERSION,
@@ -7,6 +8,7 @@ import {
   getWatchlistSignal,
   groupWatchlist,
   mergeWatchlists,
+  migrateLegacyWatchlist,
   parseWatchlist
 } from "./watchlist.js";
 
@@ -105,7 +107,16 @@ function loadJournal() {
 
 function saveEntry(input, evaluation) {
   const entries = loadJournal();
-  entries.unshift({ id: createId(), input, evaluation, status: "offen" });
+  let catalysts = [];
+  try { catalysts = JSON.parse(localStorage.getItem("chief-macro-events-v1")) || []; } catch {}
+  const market = loadWatchlist().find(item => item.symbol === input.symbol);
+  const relevantEvent = catalysts.filter(item => item.markets?.includes(input.symbol) && item.observedAt
+    && new Date(item.observedAt) <= new Date(evaluation.evaluatedAt)).at(-1);
+  const context = journalContextAt({ plan: { symbol: input.symbol, planVersion: market?.planVersion,
+    reviewStatus: relevantEvent ? "review_required" : "current" },
+    catalysts, referenceQuote: market ? { price: market.referencePrice, timestamp: market.priceAsOf,
+      source: market.quoteSource || "Manuell" } : null, evaluatedAt: evaluation.evaluatedAt });
+  entries.unshift({ id: createId(), input, evaluation, status: "offen", macroContext: context });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   renderJournal();
   renderDashboard();
@@ -155,7 +166,7 @@ function loadWatchlist() {
     if (Array.isArray(stored)) legacy = stored;
   } catch {}
 
-  const initial = mergeWatchlists(legacy, structuredClone(ACTIVE_WATCHLIST));
+  const initial = migrateLegacyWatchlist(legacy);
   saveWatchlist(initial);
   return initial;
 }
@@ -235,6 +246,7 @@ function marketCard(market, signal) {
         <label class="market-price">Referenzkurs
           <input class="table-input" type="number" step="any" value="${market.referencePrice || ""}" data-market-price="${escapeHtml(market.symbol)}" aria-label="Referenzkurs für ${escapeHtml(market.symbol)}">
           <small>${formatDateTime(market.priceAsOf)}</small>
+          <small>${escapeHtml(market.quoteSource || "Manuell")} ${escapeHtml(market.quoteProviderSymbol || "")} · Ask ${market.askPrice ? number.format(market.askPrice) : "nicht verfügbar"}</small>
         </label>
         <div class="market-state-box"><span class="badge ${signal.tone}">${signal.label}</span><small>${signal.distancePercent === undefined ? "" : `${compactNumber.format(signal.distancePercent)} % bis Level`}</small></div>
       </header>
@@ -274,7 +286,7 @@ function bindWatchlistActions(root) {
     const timestamp = new Date().toISOString();
     const updated = loadWatchlist().map(item => {
       if (item.symbol !== symbol) return item;
-      const manual = { ...item, referencePrice: newPrice, priceAsOf: timestamp };
+      const manual = { ...item, referencePrice: newPrice, askPrice: 0, priceAsOf: timestamp };
       delete manual.quoteSource;
       delete manual.quoteProviderSymbol;
       delete manual.quoteAuthoritative;
