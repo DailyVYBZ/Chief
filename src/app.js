@@ -8,6 +8,7 @@ import {
   getWatchlistSignal,
   groupWatchlist,
   mergeWatchlists,
+  migrateLegacyWatchlist,
   parseWatchlist
 } from "./watchlist.js";
 
@@ -165,7 +166,7 @@ function loadWatchlist() {
     if (Array.isArray(stored)) legacy = stored;
   } catch {}
 
-  const initial = mergeWatchlists(legacy, structuredClone(ACTIVE_WATCHLIST));
+  const initial = migrateLegacyWatchlist(legacy);
   saveWatchlist(initial);
   return initial;
 }

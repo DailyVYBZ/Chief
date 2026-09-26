@@ -1,6 +1,9 @@
 (() => {
   const WATCHLIST_KEY = "chief-watchlist-v2";
   const JOURNAL_KEY = "chief-journal-v1";
+  const ALERT_STATES_KEY = "chief-alert-states-v1";
+  const ALERT_HISTORY_KEY = "chief-alert-history-v1";
+  const MACRO_EVENTS_KEY = "chief-macro-events-v1";
   const LIVE_QUOTES_KEY = "chief-live-quotes-v1";
   const SNAPSHOTS_KEY = "chief-market-snapshots-v1";
   const MANUAL_ANCHOR_KEY = "chief-live-manual-anchor-v1";
@@ -52,7 +55,8 @@
   function ageHours(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return Infinity;
-    return Math.max(0, (Date.now() - date.getTime()) / 3_600_000);
+    const age = (Date.now() - date.getTime()) / 3_600_000;
+    return age < -5 / 60 ? Infinity : age;
   }
 
   function signalForSetup(item, referencePrice) {
@@ -194,15 +198,16 @@
 
   function applyQuotesToWatchlist(quotes) {
     if (!state.activeMode) return;
-    snapshotCurrentPrices("Vor Live Kurs Aktualisierung");
     const quoteMap = new Map(quotes.map(quote => [quote.symbol, quote]));
+    if (!loadWatchlist().some(item => quoteMap.has(item.symbol) && currentQuote(item.symbol))) return;
+    snapshotCurrentPrices("Vor Live Kurs Aktualisierung");
     const updated = loadWatchlist().map(item => {
       const quote = quoteMap.get(item.symbol);
       if (!quote?.price || !currentQuote(item.symbol)) return item;
       return {
         ...item,
         referencePrice: quote.price,
-        askPrice: quote.ask || item.askPrice || 0,
+        askPrice: quote.ask ?? 0,
         priceAsOf: quote.timestamp,
         quoteSource: quote.source,
         quoteProviderSymbol: quote.providerSymbol,
@@ -282,9 +287,9 @@
     }).sort((a, b) => a.signal.priority - b.signal.priority || a.signal.distance - b.signal.distance);
     const top = ranked.slice(0, 3);
     const stale = markets.filter(market => ageHours(market.priceAsOf) > 24).length;
-    const quoteCount = state.quotes.filter(quote => finite(quote.price)).length;
+    const quoteCount = symbols.filter(symbol => currentQuote(symbol)).length;
     const modeLabel = state.portable ? "Portable" : state.activeMode ? "Live als Referenz" : "Live Vergleich";
-    const nearest = top[0];
+    const nearest = top.find(item => item.signal.type !== "stale" && Number.isFinite(item.signal.distance));
     const timestamps = state.quotes.map(quote => quote.fetchedAt || quote.timestamp).filter(Boolean).sort();
     const last = state.lastSuccess || timestamps.at(-1);
 
@@ -316,8 +321,8 @@
       const small = provider.querySelector("small");
       const dot = provider.querySelector(".status-dot");
       if (strong) strong.textContent = state.portable ? "Manuelle XTB Kurse" : state.activeMode ? "Live Referenz aktiv" : "Live Vergleich aktiv";
-      if (small) small.textContent = state.portable ? "Portable Modus" : state.lastSuccess ? `Abruf ${formatTime(state.lastSuccess)}` : "Provider bereit";
-      if (dot) dot.classList.toggle("amber", state.portable || !state.lastSuccess);
+      if (small) small.textContent = state.portable ? "Portable Modus" : state.lastError || (state.lastSuccess ? `Abruf ${formatTime(state.lastSuccess)}` : "Provider bereit");
+      if (dot) dot.classList.toggle("amber", state.portable || !state.lastSuccess || Boolean(state.lastError));
     }
 
     const version = document.querySelector(".version");
@@ -355,8 +360,8 @@
         if (note) {
           if (livePrice) {
             const drift = market.referencePrice ? (livePrice - market.referencePrice) / market.referencePrice * 100 : null;
-            note.textContent = `${state.activeMode ? "Live" : "Vergleich"}: ${number.format(livePrice)} · ${quote.source}${Number.isFinite(drift) ? ` · Drift ${drift >= 0 ? "+" : ""}${percent.format(drift)} %` : ""}`;
-          } else note.textContent = "Kein Provider Kurs";
+            note.textContent = `${state.activeMode ? "Referenz" : "Vergleich"}: ${number.format(livePrice)} · Ask ${finite(quote.ask) ? number.format(quote.ask) : "nicht verfügbar"} · ${quote.source} · ${formatDateTime(quote.timestamp)}${Number.isFinite(drift) ? ` · Drift ${drift >= 0 ? "+" : ""}${percent.format(drift)} %` : ""}`;
+          } else note.textContent = state.quotes.some(item => item.symbol === market.symbol) ? "Provider Kurs veraltet" : "Kein Provider Kurs";
         }
         const badge = card.querySelector(".market-state-box .badge");
         const distance = card.querySelector(".market-state-box small");
@@ -413,17 +418,17 @@
     try {
       const response = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols.join(","))}`, { cache: "no-store" });
       const payload = await response.json();
-      if (!response.ok && !payload?.quotes?.length) throw new Error(payload?.error || "Marktdaten nicht verfügbar");
+      if (!response.ok && !payload?.quotes?.length) throw new Error(payload?.error || "Alle Kursprovider ausgefallen oder Kurse veraltet");
       const incoming = (payload.quotes || []).map(quote => ({ ...quote, fetchedAt: payload.generatedAt || new Date().toISOString() }));
       const received = new Set(incoming.map(quote => quote.symbol));
       state.quotes = [...incoming, ...state.quotes.filter(quote => !received.has(quote.symbol))];
       if (incoming.length) state.lastSuccess = payload.generatedAt || new Date().toISOString();
-      state.lastError = payload.status?.missing?.length ? `${payload.status.missing.length} Märkte ohne Kurs` : "";
+      state.lastError = payload.status?.missing?.length ? `${payload.status.missing.length} Märkte ohne aktuellen Kurs: ${payload.status.missing.join(", ")}` : "";
       saveJson(LIVE_QUOTES_KEY, state.quotes);
       applyQuotesToWatchlist(incoming);
       updateVisibleCards();
       renderCommandCenter();
-      if (manual) showNotice(`${state.quotes.length} Live Referenzkurse aktualisiert`);
+      if (manual) showNotice(`${incoming.length}/${symbols.length} Referenzkurse aktualisiert${state.lastError ? ` · ${state.lastError}` : ""}`);
     } catch (error) {
       state.lastError = error.message || "Live Abruf fehlgeschlagen";
       if (manual) showNotice(state.lastError);
@@ -460,6 +465,9 @@
       exportedAt: new Date().toISOString(),
       watchlist: loadWatchlist(),
       journal: loadJson(JOURNAL_KEY, []),
+      alertStates: loadJson(ALERT_STATES_KEY, {}),
+      alertHistory: loadJson(ALERT_HISTORY_KEY, []),
+      macroEvents: loadJson(MACRO_EVENTS_KEY, []),
       liveQuotes: state.quotes,
       snapshots: loadJson(SNAPSHOTS_KEY, []),
       manualAnchor: loadJson(MANUAL_ANCHOR_KEY, null),

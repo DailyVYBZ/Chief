@@ -71,7 +71,7 @@ Jeder Kurs enthält mindestens Symbol, Provider Symbol, Preis, Zeitstempel, Quel
 * Teilabdeckung wird explizit gemeldet
 * Ein fehlerhafter Provider überschreibt keine Triggerlogik
 * Externe Kurse verändern keine Planparameter
-* Workspace Backup enthält Watchlist, Journal, Live Kurse und Snapshots
+* Workspace Backup enthält Watchlist, Journal, Alarmzustände, Alarmhistorie, Makro Ereignisse, Live Kurse und Snapshots. Es ist ein Export, kein geräteübergreifender Sync oder automatischer Import.
 * Portable Datei schaltet den automatischen Live Referenzmodus ab
 * Kurse ohne echten Provider Zeitstempel und Kurse älter als 24 Stunden werden verworfen; Zeitstempel aus der Zukunft über fünf Minuten ebenso
 * Teilweise fehlgeschlagene Abrufe behalten den letzten gespeicherten Wert, kennzeichnen ihn nach Ablauf der Frist aber nicht als frisch

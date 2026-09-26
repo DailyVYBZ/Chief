@@ -41,12 +41,13 @@ export function normalizeYahooQuote(chiefSymbol, payload, now = new Date()) {
 
   const meta = result.meta || {};
   const quote = result.indicators?.quote?.[0] || {};
-  const price = finiteNumber(meta.regularMarketPrice) || lastFinite(quote.close);
+  const marketPrice = finiteNumber(meta.regularMarketPrice);
+  const price = marketPrice || lastFinite(quote.close);
   if (!price) throw new Error("Yahoo Kurs fehlt");
 
   const marketTime = Number(meta.regularMarketTime);
   const lastTimestamp = Number(result.timestamp?.at?.(-1));
-  const timestampSeconds = Number.isFinite(marketTime) && marketTime > 0
+  const timestampSeconds = marketPrice && Number.isFinite(marketTime) && marketTime > 0
     ? marketTime
     : Number.isFinite(lastTimestamp) && lastTimestamp > 0 ? lastTimestamp : null;
   if (!timestampSeconds) throw new Error("Yahoo Datenzeitpunkt fehlt");

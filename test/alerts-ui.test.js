@@ -12,7 +12,7 @@ test("stored alarm history renders with journal choices and escapes user content
   const panel = { innerHTML: "", style: {}, querySelectorAll: () => [] };
   const document = { readyState: "complete", createElement: () => panel,
     querySelector: selector => selector === ".attention-card" ? { insertAdjacentElement() {} } : panel };
-  const source = readFileSync(new URL("../src/alerts-ui.js", import.meta.url), "utf8").replace(/^import .*;\n/, "");
+  const source = readFileSync(new URL("../src/alerts-ui.js", import.meta.url), "utf8").replace(/^import .*;\r?\n/, "");
   runInNewContext(source, { ...alerts, document, window: { addEventListener() {} }, localStorage: {
     getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value)
   } });

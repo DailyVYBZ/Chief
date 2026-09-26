@@ -21,8 +21,8 @@ const [html, css, engineSource, watchlistSource, appSource, liveSource, alertsSo
 const withoutExports = source => source.replace(/^export\s+/gm, "");
 const withoutImports = source => source.replace(/^import\s+[\s\S]*?from\s+["'][^"']+["'];\s*$/gm, "");
 const engine = `const ChiefEngine = (() => {\n${withoutExports(engineSource)}\nreturn { evaluateSetup };\n})();`;
-const watchlist = `const ChiefWatchlist = (() => {\n${withoutExports(watchlistSource)}\nreturn { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist };\n})();`;
-const app = `(() => {\nconst { evaluateSetup } = ChiefEngine;\nconst { journalContextAt } = ChiefMacro;\nconst { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist } = ChiefWatchlist;\n${withoutImports(appSource)}\n})();`;
+const watchlist = `const ChiefWatchlist = (() => {\n${withoutExports(watchlistSource)}\nreturn { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, migrateLegacyWatchlist, parseWatchlist };\n})();`;
+const app = `(() => {\nconst { evaluateSetup } = ChiefEngine;\nconst { journalContextAt } = ChiefMacro;\nconst { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, migrateLegacyWatchlist, parseWatchlist } = ChiefWatchlist;\n${withoutImports(appSource)}\n})();`;
 const alerts = `const ChiefAlerts = (() => {\n${withoutExports(alertsSource)}\nreturn { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice };\n})();`;
 const alertsUi = `(() => {\nconst { buildAlertDefinitions, advanceAlert, confirmAlert, freshAlertPrice } = ChiefAlerts;\n${withoutImports(alertsUiSource)}\n})();`;
 const portfolio = `const ChiefPortfolio = (() => {\n${withoutExports(portfolioSource)}\nreturn { openPosition, recordExit, positionResult, portfolioRisk, journalStatistics };\n})();`;

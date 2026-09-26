@@ -57,6 +57,16 @@ test("fällt bei Yahoo auf den letzten Schlusskurs zurück", () => {
   };
   const quote = normalizeYahooQuote("OIL", payload, new Date("2026-09-11T16:00:00Z"));
   assert.equal(quote.price, 104.35);
+  assert.equal(quote.timestamp, new Date(1789142340 * 1000).toISOString());
+});
+
+test("Yahoo Schlusskurs übernimmt seinen eigenen Zeitpunkt statt eines fremden Markttimestamps", () => {
+  const quote = normalizeYahooQuote("GOLD", { chart: { result: [{
+    meta: { regularMarketTime: 1789000000 }, timestamp: [1789142340],
+    indicators: { quote: [{ close: [100] }] }
+  }] } });
+  assert.equal(quote.price, 100);
+  assert.equal(quote.timestamp, new Date(1789142340 * 1000).toISOString());
 });
 
 test("erfindet bei fehlendem Provider Zeitstempel keinen aktuellen Kurs", () => {

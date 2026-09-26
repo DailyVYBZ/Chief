@@ -25,7 +25,7 @@ Chief 0.5 ergänzt einen lokalen Node Server und ein Live Command Center.
 * Live Vergleich standardmäßig ohne Veränderung deiner XTB Referenzkurse
 * Optionaler Live Referenzmodus mit automatischer Rückkehr zum vorherigen XTB Kursstand
 * Kurs Snapshots vor automatischen Änderungen
-* Workspace Backup mit Watchlist, Journal, Live Kursen und Snapshots
+* Workspace Backup mit Watchlist, Journal, Alarmzuständen, Alarmhistorie, Makro Ereignissen, Live Kursen und Snapshots
 * Top drei Märkte nach Trigger oder Nachkaufnähe im Command Center
 * Tastenkürzel `R` für Kursabruf und `/` für die Watchlist Suche
 

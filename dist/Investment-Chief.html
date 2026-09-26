@@ -97,11 +97,11 @@ main{max-width:1500px;margin:0 auto;padding:30px 34px 70px}
 .kpi-card.accent strong{color:var(--lime)}
 
 .dashboard-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(285px,.7fr);gap:18px;margin-bottom:18px}
-.panel{border:1px solid var(--line);background:linear-gradient(145deg,var(--panel-2),var(--panel));border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel{min-width:0;border:1px solid var(--line);background:linear-gradient(145deg,var(--panel-2),var(--panel));border-radius:var(--radius);box-shadow:var(--shadow)}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:19px 20px 14px}
 .panel-head h3{font-size:1rem;margin:3px 0 0}
 .panel-kicker{color:#69727f!important}
-.table-wrap{overflow-x:auto}
+.table-wrap{max-width:100%;overflow-x:auto}
 table{width:100%;border-collapse:collapse;text-align:left;font-size:.81rem}
 th{color:#68717e;font-size:.67rem;text-transform:uppercase;letter-spacing:.09em;font-weight:750;padding:10px 13px;border-bottom:1px solid var(--line)}
 td{padding:13px;border-bottom:1px solid rgba(37,42,51,.75);white-space:nowrap}
@@ -727,6 +727,11 @@ function mergeWatchlists(current, incoming) {
   return [...merged.values()];
 }
 
+function migrateLegacyWatchlist(legacy) {
+  // Preserve the user's saved plans when a seeded scenario has the same key.
+  return mergeWatchlists(ACTIVE_WATCHLIST, legacy);
+}
+
 function groupWatchlist(items) {
   const groups = new Map();
   (items || []).map(normalizeWatchlistItem).forEach(item => {
@@ -822,8 +827,8 @@ function getWatchlistSignal(item, now = new Date()) {
   const normalized = normalizeWatchlistItem(item);
   if (normalized.planStatus !== "validated") return { label: "HISTORISCH", tone: "muted", priority: 5 };
   const timestamp = new Date(normalized.priceAsOf);
-  const ageHours = Number.isNaN(timestamp.getTime()) ? Infinity : Math.max(0, (now - timestamp) / 3_600_000);
-  if (ageHours > 24) return { label: "DATEN ALT", tone: "bad", priority: 4, ageHours };
+  const ageHours = Number.isNaN(timestamp.getTime()) ? Infinity : (now - timestamp) / 3_600_000;
+  if (ageHours > 24 || ageHours < -5 / 60) return { label: "DATEN ALT", tone: "bad", priority: 4, ageHours };
   if (!normalized.referencePrice || !normalized.trigger) return { label: "KURS FEHLT", tone: "bad", priority: 4, ageHours };
   const distancePercent = Math.abs(normalized.referencePrice - normalized.trigger) / normalized.trigger * 100;
   const triggered = normalized.direction === "short"
@@ -836,6 +841,10 @@ function getWatchlistSignal(item, now = new Date()) {
 }
 
 function getMarketSignal(market, now = new Date()) {
+  const priceTime = new Date(market.priceAsOf).getTime();
+  if (!Number.isFinite(priceTime) || now.getTime() - priceTime > 86_400_000 || priceTime - now.getTime() > 300_000) {
+    return { label: "DATEN ALT", tone: "bad", priority: 4, focusType: "stale", level: null, focusItem: null };
+  }
   const setups = [market.long, market.short].filter(Boolean).map(item => ({ item, signal: getWatchlistSignal(item, now) }));
   setups.sort((a, b) => a.signal.priority - b.signal.priority || (a.signal.distancePercent ?? Infinity) - (b.signal.distancePercent ?? Infinity));
   const best = setups[0] || { item: null, signal: { label: "KEIN SETUP", tone: "muted", priority: 5 } };
@@ -863,7 +872,7 @@ function exportWatchlist(items) {
   }, null, 2);
 }
 
-return { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist };
+return { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, migrateLegacyWatchlist, parseWatchlist };
 })();
 const ChiefMacro = (() => {
 const TYPES = new Set(["CPI", "FED", "EZB", "ARBEITSMARKT", "OEL", "KRYPTO"]);
@@ -921,7 +930,7 @@ return { createCatalyst, publishCatalyst, applyCatalystToPlan, journalContextAt 
 (() => {
 const { evaluateSetup } = ChiefEngine;
 const { journalContextAt } = ChiefMacro;
-const { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, parseWatchlist } = ChiefWatchlist;
+const { ACTIVE_WATCHLIST, WATCHLIST_VERSION, exportWatchlist, getMarketSignal, getWatchlistSignal, groupWatchlist, mergeWatchlists, migrateLegacyWatchlist, parseWatchlist } = ChiefWatchlist;
 
 
 
@@ -1079,7 +1088,7 @@ function loadWatchlist() {
     if (Array.isArray(stored)) legacy = stored;
   } catch {}
 
-  const initial = mergeWatchlists(legacy, structuredClone(ACTIVE_WATCHLIST));
+  const initial = migrateLegacyWatchlist(legacy);
   saveWatchlist(initial);
   return initial;
 }
@@ -1407,6 +1416,9 @@ if (viewTitles[initialView]) switchView(initialView);
 (() => {
   const WATCHLIST_KEY = "chief-watchlist-v2";
   const JOURNAL_KEY = "chief-journal-v1";
+  const ALERT_STATES_KEY = "chief-alert-states-v1";
+  const ALERT_HISTORY_KEY = "chief-alert-history-v1";
+  const MACRO_EVENTS_KEY = "chief-macro-events-v1";
   const LIVE_QUOTES_KEY = "chief-live-quotes-v1";
   const SNAPSHOTS_KEY = "chief-market-snapshots-v1";
   const MANUAL_ANCHOR_KEY = "chief-live-manual-anchor-v1";
@@ -1458,7 +1470,8 @@ if (viewTitles[initialView]) switchView(initialView);
   function ageHours(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return Infinity;
-    return Math.max(0, (Date.now() - date.getTime()) / 3_600_000);
+    const age = (Date.now() - date.getTime()) / 3_600_000;
+    return age < -5 / 60 ? Infinity : age;
   }
 
   function signalForSetup(item, referencePrice) {
@@ -1600,15 +1613,16 @@ if (viewTitles[initialView]) switchView(initialView);
 
   function applyQuotesToWatchlist(quotes) {
     if (!state.activeMode) return;
-    snapshotCurrentPrices("Vor Live Kurs Aktualisierung");
     const quoteMap = new Map(quotes.map(quote => [quote.symbol, quote]));
+    if (!loadWatchlist().some(item => quoteMap.has(item.symbol) && currentQuote(item.symbol))) return;
+    snapshotCurrentPrices("Vor Live Kurs Aktualisierung");
     const updated = loadWatchlist().map(item => {
       const quote = quoteMap.get(item.symbol);
       if (!quote?.price || !currentQuote(item.symbol)) return item;
       return {
         ...item,
         referencePrice: quote.price,
-        askPrice: quote.ask || item.askPrice || 0,
+        askPrice: quote.ask ?? 0,
         priceAsOf: quote.timestamp,
         quoteSource: quote.source,
         quoteProviderSymbol: quote.providerSymbol,
@@ -1688,9 +1702,9 @@ if (viewTitles[initialView]) switchView(initialView);
     }).sort((a, b) => a.signal.priority - b.signal.priority || a.signal.distance - b.signal.distance);
     const top = ranked.slice(0, 3);
     const stale = markets.filter(market => ageHours(market.priceAsOf) > 24).length;
-    const quoteCount = state.quotes.filter(quote => finite(quote.price)).length;
+    const quoteCount = symbols.filter(symbol => currentQuote(symbol)).length;
     const modeLabel = state.portable ? "Portable" : state.activeMode ? "Live als Referenz" : "Live Vergleich";
-    const nearest = top[0];
+    const nearest = top.find(item => item.signal.type !== "stale" && Number.isFinite(item.signal.distance));
     const timestamps = state.quotes.map(quote => quote.fetchedAt || quote.timestamp).filter(Boolean).sort();
     const last = state.lastSuccess || timestamps.at(-1);
 
@@ -1722,8 +1736,8 @@ if (viewTitles[initialView]) switchView(initialView);
       const small = provider.querySelector("small");
       const dot = provider.querySelector(".status-dot");
       if (strong) strong.textContent = state.portable ? "Manuelle XTB Kurse" : state.activeMode ? "Live Referenz aktiv" : "Live Vergleich aktiv";
-      if (small) small.textContent = state.portable ? "Portable Modus" : state.lastSuccess ? `Abruf ${formatTime(state.lastSuccess)}` : "Provider bereit";
-      if (dot) dot.classList.toggle("amber", state.portable || !state.lastSuccess);
+      if (small) small.textContent = state.portable ? "Portable Modus" : state.lastError || (state.lastSuccess ? `Abruf ${formatTime(state.lastSuccess)}` : "Provider bereit");
+      if (dot) dot.classList.toggle("amber", state.portable || !state.lastSuccess || Boolean(state.lastError));
     }
 
     const version = document.querySelector(".version");
@@ -1761,8 +1775,8 @@ if (viewTitles[initialView]) switchView(initialView);
         if (note) {
           if (livePrice) {
             const drift = market.referencePrice ? (livePrice - market.referencePrice) / market.referencePrice * 100 : null;
-            note.textContent = `${state.activeMode ? "Live" : "Vergleich"}: ${number.format(livePrice)} · ${quote.source}${Number.isFinite(drift) ? ` · Drift ${drift >= 0 ? "+" : ""}${percent.format(drift)} %` : ""}`;
-          } else note.textContent = "Kein Provider Kurs";
+            note.textContent = `${state.activeMode ? "Referenz" : "Vergleich"}: ${number.format(livePrice)} · Ask ${finite(quote.ask) ? number.format(quote.ask) : "nicht verfügbar"} · ${quote.source} · ${formatDateTime(quote.timestamp)}${Number.isFinite(drift) ? ` · Drift ${drift >= 0 ? "+" : ""}${percent.format(drift)} %` : ""}`;
+          } else note.textContent = state.quotes.some(item => item.symbol === market.symbol) ? "Provider Kurs veraltet" : "Kein Provider Kurs";
         }
         const badge = card.querySelector(".market-state-box .badge");
         const distance = card.querySelector(".market-state-box small");
@@ -1819,17 +1833,17 @@ if (viewTitles[initialView]) switchView(initialView);
     try {
       const response = await fetch(`/api/quotes?symbols=${encodeURIComponent(symbols.join(","))}`, { cache: "no-store" });
       const payload = await response.json();
-      if (!response.ok && !payload?.quotes?.length) throw new Error(payload?.error || "Marktdaten nicht verfügbar");
+      if (!response.ok && !payload?.quotes?.length) throw new Error(payload?.error || "Alle Kursprovider ausgefallen oder Kurse veraltet");
       const incoming = (payload.quotes || []).map(quote => ({ ...quote, fetchedAt: payload.generatedAt || new Date().toISOString() }));
       const received = new Set(incoming.map(quote => quote.symbol));
       state.quotes = [...incoming, ...state.quotes.filter(quote => !received.has(quote.symbol))];
       if (incoming.length) state.lastSuccess = payload.generatedAt || new Date().toISOString();
-      state.lastError = payload.status?.missing?.length ? `${payload.status.missing.length} Märkte ohne Kurs` : "";
+      state.lastError = payload.status?.missing?.length ? `${payload.status.missing.length} Märkte ohne aktuellen Kurs: ${payload.status.missing.join(", ")}` : "";
       saveJson(LIVE_QUOTES_KEY, state.quotes);
       applyQuotesToWatchlist(incoming);
       updateVisibleCards();
       renderCommandCenter();
-      if (manual) showNotice(`${state.quotes.length} Live Referenzkurse aktualisiert`);
+      if (manual) showNotice(`${incoming.length}/${symbols.length} Referenzkurse aktualisiert${state.lastError ? ` · ${state.lastError}` : ""}`);
     } catch (error) {
       state.lastError = error.message || "Live Abruf fehlgeschlagen";
       if (manual) showNotice(state.lastError);
@@ -1866,6 +1880,9 @@ if (viewTitles[initialView]) switchView(initialView);
       exportedAt: new Date().toISOString(),
       watchlist: loadWatchlist(),
       journal: loadJson(JOURNAL_KEY, []),
+      alertStates: loadJson(ALERT_STATES_KEY, {}),
+      alertHistory: loadJson(ALERT_HISTORY_KEY, []),
+      macroEvents: loadJson(MACRO_EVENTS_KEY, []),
       liveQuotes: state.quotes,
       snapshots: loadJson(SNAPSHOTS_KEY, []),
       manualAnchor: loadJson(MANUAL_ANCHOR_KEY, null),
@@ -2390,6 +2407,5 @@ if (panel) {
 
 })();
 </script>
-
 </body>
 </html>
