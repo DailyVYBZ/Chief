@@ -63,8 +63,10 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
     if (busy || document.visibilityState === "hidden") return;
     busy = true;
     try {
-      const local = readLocalWorkspace(localStorage);
       const remote = await request("GET");
+      // Read after the network request so edits made while it was pending are
+      // included in reconciliation and in any backup before a pull.
+      const local = readLocalWorkspace(localStorage);
       const action = reconcileWorkspace(local, remote, baseline());
       if (action === "equal") { saveBaseline(remote.revision, local); setConflict(null); status(`Synchron · Version ${remote.revision}`); }
       if (action === "push") {
@@ -93,6 +95,11 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   panel.querySelector("#chief-sync-pull").addEventListener("click", () => {
     if (!conflict) return;
     try {
+      if (hash(readLocalWorkspace(localStorage)) !== hash(conflict.local)) {
+        setConflict(null);
+        status("Lokale Daten haben sich seit der Konfliktanzeige geändert. Bitte erneut abgleichen.");
+        return;
+      }
       preserveLocal(conflict.local);
       localStorage.setItem("chief-live-mode-v1", "shadow");
       localStorage.removeItem("chief-live-manual-anchor-v1");
@@ -104,6 +111,11 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   });
   panel.querySelector("#chief-sync-push").addEventListener("click", async () => {
     if (!conflict) return;
+    if (hash(readLocalWorkspace(localStorage)) !== hash(conflict.local)) {
+      setConflict(null);
+      status("Lokale Daten haben sich seit der Konfliktanzeige geändert. Bitte erneut abgleichen.");
+      return;
+    }
     download(conflict.remote.data, `chief-server-vor-abgleich-${Date.now()}.json`);
     try {
       const saved = await request("PUT", { baseRevision: conflict.remote.revision, data: conflict.local });
