@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createWorkspaceStore } from "../server/workspace-store.mjs";
@@ -24,6 +24,7 @@ test("workspace writes are versioned, durable and reject a concurrent stale revi
     data.watchlist[0].trigger = 101;
     assert.equal((await store.save(1, data)).current.revision, 2);
     assert.equal((await createWorkspaceStore(path).read()).data.watchlist[0].trigger, 101);
+    assert.equal(JSON.parse(await readFile(`${path}.bak`, "utf8")).data.watchlist[0].trigger, 100);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

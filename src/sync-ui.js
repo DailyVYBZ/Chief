@@ -4,6 +4,7 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   const BASELINE_KEY = "chief-sync-baseline-v1";
   const ENABLED_KEY = "chief-sync-enabled-v1";
   const TOKEN_KEY = "chief-sync-token-v1";
+  const LOCAL_BACKUP_KEY = "chief-sync-local-backup-v1";
   let busy = false;
   let conflict = null;
   const panel = document.createElement("section");
@@ -30,7 +31,12 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   };
   const download = (data, name) => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-    const link = document.createElement("a"); link.href = url; link.download = name; link.click(); URL.revokeObjectURL(url);
+    const link = document.createElement("a"); link.href = url; link.download = name; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  };
+  const preserveLocal = data => {
+    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data }));
+    download(data, `chief-lokal-vor-abgleich-${Date.now()}.json`);
   };
   const setConflict = value => {
     conflict = value;
@@ -51,6 +57,7 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
         saveBaseline(saved.revision, local); setConflict(null); status(`Lokal gespeichert · Version ${saved.revision}`);
       }
       if (action === "pull") {
+        preserveLocal(local);
         localStorage.setItem("chief-live-mode-v1", "shadow");
         localStorage.removeItem("chief-live-manual-anchor-v1");
         writeLocalWorkspace(localStorage, remote.data); saveBaseline(remote.revision, remote.data);
@@ -69,13 +76,15 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   panel.querySelector("#chief-sync-token").addEventListener("change", () => sessionStorage.setItem(TOKEN_KEY, token()));
   panel.querySelector("#chief-sync-pull").addEventListener("click", () => {
     if (!conflict) return;
-    download(conflict.local, `chief-lokal-vor-abgleich-${Date.now()}.json`);
-    localStorage.setItem("chief-live-mode-v1", "shadow");
-    localStorage.removeItem("chief-live-manual-anchor-v1");
-    writeLocalWorkspace(localStorage, conflict.remote.data);
-    saveBaseline(conflict.remote.revision, conflict.remote.data);
-    localStorage.setItem(ENABLED_KEY, "true");
-    location.reload();
+    try {
+      preserveLocal(conflict.local);
+      localStorage.setItem("chief-live-mode-v1", "shadow");
+      localStorage.removeItem("chief-live-manual-anchor-v1");
+      writeLocalWorkspace(localStorage, conflict.remote.data);
+      saveBaseline(conflict.remote.revision, conflict.remote.data);
+      localStorage.setItem(ENABLED_KEY, "true");
+      location.reload();
+    } catch (error) { status(`Übernahme abgebrochen: ${error.message}`); }
   });
   panel.querySelector("#chief-sync-push").addEventListener("click", async () => {
     if (!conflict) return;

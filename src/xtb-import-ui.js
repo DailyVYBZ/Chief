@@ -2,6 +2,7 @@ import { applyXtbQuotes, parseXtbQuotes } from "./xtb-import.js";
 
 (() => {
   const KEY = "chief-watchlist-v2";
+  const RESULT_KEY = "chief-xtb-import-result-v1";
   const panel = document.createElement("section");
   panel.className = "panel chief-sync-panel";
   panel.innerHTML = `<h3>XTB Kurse manuell übernehmen</h3>
@@ -22,7 +23,7 @@ import { applyXtbQuotes, parseXtbQuotes } from "./xtb-import.js";
       localStorage.removeItem("chief-live-manual-anchor-v1");
       localStorage.setItem(KEY, JSON.stringify(updated));
       window.dispatchEvent(new Event("chief:watchlist-updated"));
-      result.textContent = `${quotes.length} XTB Kurse übernommen. Instrument und Zeitpunkt vor Entscheidungen prüfen.`;
+      sessionStorage.setItem(RESULT_KEY, `${quotes.length} XTB Kurse übernommen. Instrument und Zeitpunkt vor Entscheidungen prüfen.`);
       location.reload();
     } catch (error) { result.textContent = `Import abgebrochen: ${error.message}`; }
     event.target.value = "";
@@ -30,6 +31,11 @@ import { applyXtbQuotes, parseXtbQuotes } from "./xtb-import.js";
   function init() {
     const anchor = document.querySelector("#watchlist-body");
     anchor?.parentElement?.insertAdjacentElement("beforebegin", panel);
+    const lastResult = sessionStorage.getItem(RESULT_KEY);
+    if (lastResult) {
+      panel.querySelector("#chief-xtb-result").textContent = lastResult;
+      sessionStorage.removeItem(RESULT_KEY);
+    }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true }); else init();
 })();
