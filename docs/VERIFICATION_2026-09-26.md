@@ -2,10 +2,11 @@
 
 ## Ausgeführt
 
-* `npm test`: 49 Tests bestanden, 0 fehlgeschlagen.
+* `npm test`: 50 Tests bestanden, 0 fehlgeschlagen. Der zusätzliche Integrationstest prüft den Dateiursprung mit Zugriffscode, CORS Voranfrage, versioniertem Schreibvorgang und abgewiesenem fremden Ursprung.
 * `npm run build:portable`: `dist/Investment-Chief.html` erfolgreich erstellt.
 * GitHub Actions „Chief CI“ für Commit `ae9e524`: erfolgreich.
 * Browseransicht zuvor am Desktop und mit 390 px Breite geprüft; kein horizontaler Überlauf. Das ist kein Test auf einem echten Smartphone.
+* Die portable Datei enthält jetzt den Geräteabgleich. Ihr Dateiursprung wurde über einen gestarteten lokalen Server im Integrationstest auf CORS Voranfrage, Zugriffscode, GET und PUT geprüft. Eine interaktive Sichtprüfung der Datei war nicht möglich, weil die verfügbare Browsersteuerung `file://` als gesperrtes Protokoll ablehnt. Der Servermodus wurde zuvor im Browser geprüft; das beweist nicht die portable Oberfläche.
 * Lokaler Workspace API Test zuvor mit erstem PUT, 409 bei veralteter Revision, erneutem GET nach Serverneustart, 403 ohne Origin und bei fremdem Host sowie verweigertem Start mit Netzwerkfreigabe ohne TLS/Token. Der Workspace Test prüft zusätzlich die vorige Serverrevision in `workspace.json.bak`.
 
 ## Live Abruf

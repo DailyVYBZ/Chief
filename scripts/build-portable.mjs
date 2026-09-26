@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const [html, css, engineSource, watchlistSource, appSource, liveSource, alertsSource, alertsUiSource, portfolioSource, positionsUiSource, macroSource, macroUiSource, xtbImportSource, xtbImportUiSource] = await Promise.all([
+const [html, css, engineSource, watchlistSource, appSource, liveSource, alertsSource, alertsUiSource, portfolioSource, positionsUiSource, macroSource, macroUiSource, xtbImportSource, xtbImportUiSource, workspaceSource, syncUiSource] = await Promise.all([
   readFile(resolve(root, "index.html"), "utf8"),
   readFile(resolve(root, "styles.css"), "utf8"),
   readFile(resolve(root, "src/engine.js"), "utf8"),
@@ -17,7 +17,9 @@ const [html, css, engineSource, watchlistSource, appSource, liveSource, alertsSo
   readFile(resolve(root, "src/macro.js"), "utf8"),
   readFile(resolve(root, "src/macro-ui.js"), "utf8"),
   readFile(resolve(root, "src/xtb-import.js"), "utf8"),
-  readFile(resolve(root, "src/xtb-import-ui.js"), "utf8")
+  readFile(resolve(root, "src/xtb-import-ui.js"), "utf8"),
+  readFile(resolve(root, "src/workspace.js"), "utf8"),
+  readFile(resolve(root, "src/sync-ui.js"), "utf8")
 ]);
 
 const withoutExports = source => source.replace(/^export\s+/gm, "");
@@ -33,7 +35,9 @@ const macro = `const ChiefMacro = (() => {\n${withoutExports(macroSource)}\nretu
 const macroUi = `(() => {\nconst { createCatalyst, publishCatalyst } = ChiefMacro;\n${withoutImports(macroUiSource)}\n})();`;
 const xtbImport = `const ChiefXtbImport = (() => {\n${withoutExports(withoutImports(xtbImportSource))}\nreturn { parseXtbQuotes, applyXtbQuotes };\n})();`;
 const xtbImportUi = `(() => {\nconst { parseXtbQuotes, applyXtbQuotes } = ChiefXtbImport;\n${withoutImports(xtbImportUiSource)}\n})();`;
-new Function(`${engine}\n${watchlist}\n${macro}\n${app}\n${liveSource}\n${alerts}\n${alertsUi}\n${portfolio}\n${positionsUi}\n${macroUi}\n${xtbImport}\n${xtbImportUi}`);
+const workspace = `const ChiefWorkspace = (() => {\n${withoutExports(workspaceSource)}\nreturn { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace };\n})();`;
+const syncUi = `(() => {\nconst { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } = ChiefWorkspace;\n${withoutImports(syncUiSource)}\n})();`;
+new Function(`${engine}\n${watchlist}\n${macro}\n${app}\n${liveSource}\n${alerts}\n${alertsUi}\n${portfolio}\n${positionsUi}\n${macroUi}\n${xtbImport}\n${xtbImportUi}\n${workspace}\n${syncUi}`);
 
 const stylesheetTag = '<link rel="stylesheet" href="styles.css">';
 const scriptTag = '<script type="module" src="src/app.js"></script>';
@@ -45,7 +49,7 @@ if (!html.includes(stylesheetTag) || !html.includes(scriptTag) || !html.includes
 
 const portable = html
   .replace(stylesheetTag, `<style>\n${css}\n</style>`)
-  .replace(scriptTag, `<script>\n${engine}\n${watchlist}\n${macro}\n${app}\n${liveSource}\n${alerts}\n${alertsUi}\n${portfolio}\n${positionsUi}\n${macroUi}\n${xtbImport}\n${xtbImportUi}\n</script>`)
+  .replace(scriptTag, `<script>\n${engine}\n${watchlist}\n${macro}\n${app}\n${liveSource}\n${alerts}\n${alertsUi}\n${portfolio}\n${positionsUi}\n${macroUi}\n${xtbImport}\n${xtbImportUi}\n${workspace}\n${syncUi}\n</script>`)
   .replace(/^\s*<script type="module" src="src\/positions-ui\.js"><\/script>\s*$/m, "")
   .replace(/^\s*<script type="module" src="src\/macro-ui\.js"><\/script>\s*$/m, "");
 

@@ -65,7 +65,7 @@ CHIEF_QUOTE_TIMEOUT_MS=8000
 
 ## Direkt auf Windows starten
 
-Die Datei `dist/Investment-Chief.html` herunterladen und doppelt anklicken. Sie enthält die komplette Anwendung und benötigt keinen lokalen Server. In diesem Portable Modus bleibt die Kursführung manuell. Das Command Center, Backups und Snapshots stehen trotzdem zur Verfügung.
+Die Datei `dist/Investment-Chief.html` herunterladen und doppelt anklicken. Sie enthält die komplette Anwendung und benötigt für die Offline Nutzung keinen lokalen Server. In diesem Modus bleibt die Kursführung manuell. Das Command Center, Backups und Snapshots stehen trotzdem zur Verfügung. Optional kann die Datei über **Geräteabgleich** mit einem Chief Server verbunden werden; dafür sind dessen Adresse und Zugriffscode nötig. Siehe `docs/SYNC.md`.
 
 Nach Änderungen wird die portable Datei so neu erstellt:
 

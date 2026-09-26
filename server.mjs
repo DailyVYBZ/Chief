@@ -138,13 +138,30 @@ const handler = async (req, res) => {
   }
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${port}`}`);
   if (url.pathname === "/api/workspace") {
+    // A portable file has an opaque Origin. Permit it only when this server has
+    // a token, and still require that token on every data request.
+    const portableOrigin = req.headers.origin === "null" && Boolean(syncToken);
+    if (portableOrigin) {
+      res.setHeader("access-control-allow-origin", "null");
+      res.setHeader("vary", "Origin");
+    }
+    if (req.method === "OPTIONS") {
+      if (!portableOrigin) return json(res, 403, { error: "Dateiabgleich erfordert Zugriffscode" });
+      res.writeHead(204, {
+        "access-control-allow-methods": "GET, PUT, OPTIONS",
+        "access-control-allow-headers": "authorization, content-type",
+        "access-control-max-age": "600"
+      });
+      return res.end();
+    }
     if (syncToken && req.headers.authorization !== `Bearer ${syncToken}`) return json(res, 401, { error: "Zugriffscode fehlt oder ist ungültig" });
+    if (req.headers.origin === "null" && !portableOrigin) return json(res, 403, { error: "Dateiabgleich erfordert Zugriffscode" });
     if (req.method === "GET") {
       try { return json(res, 200, await workspaceStore.read()); }
       catch { return json(res, 500, { error: "Workspace Speicher nicht lesbar" }); }
     }
     if (req.method !== "PUT") return json(res, 405, { error: "Nur GET und PUT unterstützt" });
-    if (req.headers.origin !== `${remoteHost ? "https" : "http"}://${req.headers.host}` || !/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) {
+    if (!(portableOrigin || req.headers.origin === `${remoteHost ? "https" : "http"}://${req.headers.host}`) || !/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) {
       return json(res, 403, { error: "Gleicher Ursprung und JSON erforderlich" });
     }
     try {

@@ -5,12 +5,15 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   const ENABLED_KEY = "chief-sync-enabled-v1";
   const TOKEN_KEY = "chief-sync-token-v1";
   const LOCAL_BACKUP_KEY = "chief-sync-local-backup-v1";
+  const SERVER_URL_KEY = "chief-sync-server-url-v1";
+  const portable = location.protocol === "file:";
   let busy = false;
   let conflict = null;
   const panel = document.createElement("section");
   panel.className = "panel chief-sync-panel";
   panel.innerHTML = `<h3>Geräteabgleich</h3>
     <p id="chief-sync-status" role="status">Lokaler Abgleich bereit. Daten werden erst nach „Abgleichen“ auf diesem Chief Server gespeichert.</p>
+    ${portable ? '<label>Chief Serveradresse <input id="chief-sync-server-url" type="url" placeholder="https://chief.example:4173" autocomplete="url" /></label>' : ""}
     <label>Zugriffscode für geschützten Server <input id="chief-sync-token" type="password" autocomplete="off" placeholder="Nur bei Netzwerkzugriff" /></label>
     <div class="chief-sync-actions"><button type="button" class="secondary compact" id="chief-sync-now">Abgleichen</button>
     <button type="button" class="secondary compact" id="chief-sync-pull" hidden>Serverstand übernehmen</button>
@@ -22,8 +25,20 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   const saveBaseline = (revision, data) => localStorage.setItem(BASELINE_KEY, JSON.stringify({ revision, hash: hash(data) }));
   const token = () => panel.querySelector("#chief-sync-token").value.trim();
   const headers = () => token() ? { Authorization: `Bearer ${token()}` } : {};
+  const endpoint = () => {
+    if (!portable) return "/api/workspace";
+    const raw = panel.querySelector("#chief-sync-server-url").value.trim();
+    let url;
+    try { url = new URL(raw); } catch { throw new Error("Gültige Chief Serveradresse eingeben"); }
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if ((url.protocol !== "https:" && !(loopback && url.protocol === "http:")) || url.username || url.password || url.search || url.hash || url.pathname !== "/") {
+      throw new Error("Serveradresse benötigt HTTPS; HTTP ist nur auf diesem PC erlaubt");
+    }
+    if (!token()) throw new Error("Für die portable Datei ist ein Zugriffscode erforderlich");
+    return `${url.origin}/api/workspace`;
+  };
   const request = async (method, body) => {
-    const response = await fetch("/api/workspace", { method, headers: { ...headers(), ...(body ? { "Content-Type": "application/json" } : {}) },
+    const response = await fetch(endpoint(), { method, headers: { ...headers(), ...(body ? { "Content-Type": "application/json" } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}), cache: "no-store" });
     const payload = await response.json();
     if (!response.ok) throw new Error(response.status === 409 ? "Anderes Gerät hat zuerst gespeichert. Erneut abgleichen." : payload.error || `HTTP ${response.status}`);
@@ -73,6 +88,7 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
   }
 
   panel.querySelector("#chief-sync-now").addEventListener("click", sync);
+  if (portable) panel.querySelector("#chief-sync-server-url").addEventListener("change", event => localStorage.setItem(SERVER_URL_KEY, event.target.value.trim()));
   panel.querySelector("#chief-sync-token").addEventListener("change", () => sessionStorage.setItem(TOKEN_KEY, token()));
   panel.querySelector("#chief-sync-pull").addEventListener("click", () => {
     if (!conflict) return;
@@ -100,6 +116,10 @@ import { readLocalWorkspace, reconcileWorkspace, writeLocalWorkspace } from "./w
     if (!anchor) return;
     anchor.insertAdjacentElement("afterend", panel);
     panel.querySelector("#chief-sync-token").value = sessionStorage.getItem(TOKEN_KEY) || "";
+    if (portable) {
+      panel.querySelector("#chief-sync-server-url").value = localStorage.getItem(SERVER_URL_KEY) || "";
+      status("Portable Datei bereit. Serveradresse und Zugriffscode eingeben, dann Abgleichen wählen.");
+    }
     if (localStorage.getItem(ENABLED_KEY) === "true") sync();
     window.setInterval(() => { if (localStorage.getItem(ENABLED_KEY) === "true") sync(); }, 30_000);
   }
