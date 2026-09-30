@@ -48,7 +48,7 @@ export function confirmAlert(state, definition, { timeframe, closePrice, closedA
   if (state?.status !== "reached") throw new Error("Level wurde noch nicht erreicht");
   if (timeframe !== definition.timeframe) throw new Error(`Bestätigung benötigt ${definition.timeframe} Schluss`);
   const time = new Date(closedAt).getTime();
-  if (!Number.isFinite(time) || time < new Date(state.reachedAt).getTime() || time > now.getTime() + 300_000)
+  if (!Number.isFinite(time) || time < new Date(state.reachedAt).getTime() || time > now.getTime() + 300_000 || now.getTime() - time > 86_400_000)
     throw new Error("Kerzenschluss liegt außerhalb des Prüfzeitraums");
   const price = Number(closePrice);
   if (!Number.isFinite(price) || price <= 0 || (definition.direction === "short" ? price >= definition.level : price <= definition.level))

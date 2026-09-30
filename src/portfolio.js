@@ -86,3 +86,21 @@ export function portfolioRisk(positions, { portfolioEur, maxRiskPercent, propose
     exceedsLimit: totalRiskEur + proposedRiskEur > limit
   };
 }
+
+export function journalStatistics(positions) {
+  const closed = positions.filter(position => positionResult(position).status === "closed");
+  const sum = closed.reduce((result, position) => {
+    const outcome = positionResult(position);
+    result.realizedEur += outcome.realizedEur;
+    result.totalR += outcome.realizedR;
+    result.wins += outcome.realizedEur > 0 ? 1 : 0;
+    result.ruleCompliant += position.ruleDeviation === false ? 1 : 0;
+    result.ruleReviewed += typeof position.ruleDeviation === "boolean" ? 1 : 0;
+    return result;
+  }, { realizedEur: 0, totalR: 0, wins: 0, ruleCompliant: 0, ruleReviewed: 0 });
+  return { closedTrades: closed.length, realizedEur: sum.realizedEur,
+    winRatePercent: closed.length ? sum.wins / closed.length * 100 : null,
+    averageR: closed.length ? sum.totalR / closed.length : null,
+    ruleCompliancePercent: sum.ruleReviewed ? sum.ruleCompliant / sum.ruleReviewed * 100 : null,
+    ruleReviewed: sum.ruleReviewed };
+}

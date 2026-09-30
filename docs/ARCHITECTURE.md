@@ -16,7 +16,7 @@ Ein Instrument durchläuft den vollständigen Prozess Referenzkurs, Trigger, Bes
 8. Die Positionsgröße wird durch das Risikobudget und zugleich durch maximal 20 Prozent Portfolioallokation begrenzt.
 9. H4 Trend und H1 Bestätigung erhalten im Bewertungsmodell zusammen 40 von 100 Punkten.
 10. Jede gespeicherte Entscheidung enthält Eingaben, Ergebnis, Regelversion und Bewertungszeitpunkt.
-11. Das aktuelle MVP speichert Journal und Watchlist lokal im Browser. Die Watchlist Version 2 migriert vorhandene Version 1 Einträge und überschreibt bestätigte gleiche Symbol Richtungs Kombinationen mit dem aktiven Marktplan.
+11. Die Watchlist Version 2 migriert vorhandene Version 1 Einträge. Bei gleicher Symbol Richtungs Kombination bleibt der gespeicherte Nutzerplan erhalten; fehlende Startszenarien werden ergänzt.
 12. BTC, ETH und SOL dürfen zusätzliche Nachkauflevel enthalten. Diese Level ersetzen keinen Long Trigger für ein Swing Setup.
 13. Automatische Provider Zugriffe gehören nicht in den Browser. Der lokale Server kapselt Yahoo und CoinGecko mit getrennten Adaptern und hält optionale Zugangsdaten nur in Server Umgebungsvariablen.
 14. Die portable Einzeldatei muss dieselbe Bewertungslogik und denselben aktiven Marktplan wie die Server Version enthalten.
@@ -42,4 +42,4 @@ Ein Instrument durchläuft den vollständigen Prozess Referenzkurs, Trigger, Bes
 3. Trade Ergebnis mit Ausstieg, Gebühren und Regelabweichung erfassen.
 4. Offene Positionen zu Gesamtportfoliorisiko und Korrelation verdichten.
 5. Chief Score und Marktstatus mit aktuellen Makro und Nachrichten Katalysatoren ergänzen.
-6. Portfolio und Watchlist zwischen Geräten zentral synchronisieren.
+6. Der lokale Chief Server verwaltet einen versionierten Workspace mit Konflikterkennung. Die Freigabe im lokalen Netz benötigt einen Zugriffscode und ein vertrauenswürdiges TLS Zertifikat; eine Cloud Bereitstellung ist nicht aktiviert.

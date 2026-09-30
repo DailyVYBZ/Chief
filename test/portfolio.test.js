@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { openPosition, recordExit, positionResult, portfolioRisk } from "../src/portfolio.js";
+import { openPosition, recordExit, positionResult, portfolioRisk, journalStatistics } from "../src/portfolio.js";
 
 const openedAt = "2026-09-24T10:00:00Z";
 const closedAt = "2026-09-24T12:00:00Z";
@@ -52,4 +52,15 @@ test("portfolio view groups shared exposures and previews additional risk", () =
   assert.deepEqual(analysis.concentrationGroups, ["Edelmetalle"]);
   assert.equal(analysis.availableRiskEur, 0);
   assert.equal(analysis.exceedsLimit, true);
+});
+
+test("journal statistics exclude open trades and distinguish unreviewed rules", () => {
+  const winner = recordExit(make(), { units: 10, price: 110, fxEurPerCurrency: 1, closedAt });
+  const loser = recordExit(make(), { units: 10, price: 90, fxEurPerCurrency: 1, closedAt });
+  const stats = journalStatistics([{ ...winner, ruleDeviation: false }, loser, make()]);
+  assert.equal(stats.closedTrades, 2);
+  assert.equal(stats.winRatePercent, 50);
+  assert.equal(stats.ruleReviewed, 1);
+  assert.equal(stats.ruleCompliancePercent, 100);
+  assert.equal(journalStatistics([make()]).averageR, null);
 });

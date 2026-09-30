@@ -155,6 +155,9 @@ export function normalizeWatchlistItem(item, index = 0) {
     source: String(item.source || "Import").trim(),
     planDate: item.planDate || "",
     priceAsOf: item.priceAsOf || "",
+    quoteSource: String(item.quoteSource || "").trim(),
+    quoteProviderSymbol: String(item.quoteProviderSymbol || "").trim(),
+    quoteAuthoritative: item.quoteAuthoritative === true,
     planStatus: item.planStatus === "validated" ? "validated" : "historical",
     planVersion: Number(item.planVersion) || 1,
     confirmation: String(item.confirmation || "").trim(),
@@ -181,6 +184,11 @@ export function mergeWatchlists(current, incoming) {
   return [...merged.values()];
 }
 
+export function migrateLegacyWatchlist(legacy) {
+  // Preserve the user's saved plans when a seeded scenario has the same key.
+  return mergeWatchlists(ACTIVE_WATCHLIST, legacy);
+}
+
 export function groupWatchlist(items) {
   const groups = new Map();
   (items || []).map(normalizeWatchlistItem).forEach(item => {
@@ -197,6 +205,8 @@ export function groupWatchlist(items) {
         source: item.source,
         planDate: item.planDate,
         priceAsOf: item.priceAsOf,
+        quoteSource: item.quoteSource,
+        quoteProviderSymbol: item.quoteProviderSymbol,
         accumulationLevels: [],
         long: null,
         short: null,
@@ -213,6 +223,8 @@ export function groupWatchlist(items) {
     group.source = item.source || group.source;
     group.planDate = item.planDate || group.planDate;
     group.priceAsOf = item.priceAsOf || group.priceAsOf;
+    group.quoteSource = item.quoteSource || group.quoteSource;
+    group.quoteProviderSymbol = item.quoteProviderSymbol || group.quoteProviderSymbol;
     group.missingPlanReason = item.missingPlanReason || group.missingPlanReason;
     group.accumulationLevels = [...new Set([...group.accumulationLevels, ...item.accumulationLevels])];
     group[item.direction === "short" ? "short" : "long"] = item;
@@ -276,8 +288,8 @@ export function getWatchlistSignal(item, now = new Date()) {
   const normalized = normalizeWatchlistItem(item);
   if (normalized.planStatus !== "validated") return { label: "HISTORISCH", tone: "muted", priority: 5 };
   const timestamp = new Date(normalized.priceAsOf);
-  const ageHours = Number.isNaN(timestamp.getTime()) ? Infinity : Math.max(0, (now - timestamp) / 3_600_000);
-  if (ageHours > 24) return { label: "DATEN ALT", tone: "bad", priority: 4, ageHours };
+  const ageHours = Number.isNaN(timestamp.getTime()) ? Infinity : (now - timestamp) / 3_600_000;
+  if (ageHours > 24 || ageHours < -5 / 60) return { label: "DATEN ALT", tone: "bad", priority: 4, ageHours };
   if (!normalized.referencePrice || !normalized.trigger) return { label: "KURS FEHLT", tone: "bad", priority: 4, ageHours };
   const distancePercent = Math.abs(normalized.referencePrice - normalized.trigger) / normalized.trigger * 100;
   const triggered = normalized.direction === "short"
@@ -290,6 +302,10 @@ export function getWatchlistSignal(item, now = new Date()) {
 }
 
 export function getMarketSignal(market, now = new Date()) {
+  const priceTime = new Date(market.priceAsOf).getTime();
+  if (!Number.isFinite(priceTime) || now.getTime() - priceTime > 86_400_000 || priceTime - now.getTime() > 300_000) {
+    return { label: "DATEN ALT", tone: "bad", priority: 4, focusType: "stale", level: null, focusItem: null };
+  }
   const setups = [market.long, market.short].filter(Boolean).map(item => ({ item, signal: getWatchlistSignal(item, now) }));
   setups.sort((a, b) => a.signal.priority - b.signal.priority || (a.signal.distancePercent ?? Infinity) - (b.signal.distancePercent ?? Infinity));
   const best = setups[0] || { item: null, signal: { label: "KEIN SETUP", tone: "muted", priority: 5 } };
